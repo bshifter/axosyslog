@@ -382,7 +382,7 @@ filterx_word	[^ \#'"/\(\)\{\}\[\]\\;\r\n\t,|\.@:]
 			     return LL_STRING;
 		           }
 <slash_string>\\\/	   { g_string_append_c(yyextra->string_buffer, '/'); }
-<slash_string>[^/\r\n]+	   { g_string_append(yyextra->string_buffer, yytext); }
+<slash_string>[^///\r\n]+	   { g_string_append(yyextra->string_buffer, yytext); }
 <slash_string>\/	   {
 			     yy_pop_state(yyscanner);
 			     yylval->cptr = strdup(yyextra->string_buffer->str);
