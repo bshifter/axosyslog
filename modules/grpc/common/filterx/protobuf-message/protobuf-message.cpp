@@ -21,7 +21,7 @@
  *
  */
 
-#include "object-protobuf-message.hpp"
+#include "protobuf-message.hpp"
 
 #include "compat/cpp-start.h"
 
@@ -181,12 +181,12 @@ filterx_protobuf_message_new_from_args(FilterXFunctionArgs *args, GError **error
 
 FILTERX_FUNCTION(protobuf_message, filterx_protobuf_message_new_from_args);
 
-FILTERX_DEFINE_TYPE(protobuf_message, FILTERX_TYPE_NAME(object),
-                    .is_mutable = TRUE,
-                    .marshal = _marshal,
-                    .clone = _filterx_protobuf_message_clone,
-                    .truthy = _truthy,
-                    .format_json = _format_json,
-                    .repr = _repr,
-                    .free_fn = _free,
-                   );
+// FILTERX_DEFINE_TYPE(protobuf_message, FILTERX_TYPE_NAME(object),
+//                     .is_mutable = TRUE,
+//                     .marshal = _marshal,
+//                     .clone = _filterx_protobuf_message_clone,
+//                     .truthy = _truthy,
+//                     .format_json = _format_json,
+//                     .repr = _repr,
+//                     .free_fn = _free,
+//                    );

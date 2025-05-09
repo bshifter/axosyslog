@@ -25,12 +25,11 @@
 #define OBJECT_PROTOBUFMESSAGE_MESSAGE_HPP
 
 #include "syslog-ng.h"
-// #include "grpc/common/grpc-dest.hpp"
 #include "schema/grpc-schema.hpp"
 
 #include "compat/cpp-start.h"
 #include "filterx/object-dict-interface.h"
-#include "object-protobuf.h"
+#include "protobuf-message.h"
 #include "compat/cpp-end.h"
 
 
@@ -38,7 +37,7 @@
 
 typedef struct FilterXProtobufMessage_ FilterXProtobufMessage;
 
-FilterXObject *_filterx_protobuf_message_clone(FilterXObject *s);
+// FilterXObject *_filterx_protobuf_message_clone(FilterXObject *s);
 
 namespace syslogng {
 namespace grpc {
@@ -63,7 +62,7 @@ private:
   FilterXProtobufMessage *super;
   Schema *schema;
   Message(const Message &o, FilterXProtobufMessage *super);
-  friend FilterXObject *::_filterx_protobuf_message_clone(FilterXObject *s);
+  // friend FilterXObject *::_filterx_protobuf_message_clone(FilterXObject *s);
 };
 
 }
