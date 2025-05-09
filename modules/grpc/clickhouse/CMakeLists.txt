@@ -35,3 +35,6 @@ add_module(
 )
 
 set_target_properties(clickhouse PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib;${CMAKE_INSTALL_PREFIX}/lib/syslog-ng")
+
+add_subdirectory(filterx)
+target_link_libraries(clickhouse PRIVATE protobuf_filterx_message_cpp)

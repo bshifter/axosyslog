@@ -25,6 +25,7 @@
 #include "plugin.h"
 #include "plugin-types.h"
 #include "protos/apphook.h"
+#include "filterx/object-protobuf.h"
 
 extern CfgParser clickhouse_parser;
 
@@ -35,6 +36,7 @@ static Plugin clickhouse_plugins[] =
     .name = "clickhouse",
     .parser = &clickhouse_parser,
   },
+  FILTERX_FUNCTION_PLUGIN(protobuf_message),
 };
 
 gboolean
