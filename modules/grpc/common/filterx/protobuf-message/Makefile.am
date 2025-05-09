@@ -4,9 +4,9 @@ if ENABLE_GRPC
 noinst_LTLIBRARIES += modules/grpc/clickhouse/filterx/libfilterx.la
 
 modules_grpc_clickhouse_filterx_libfilterx_la_SOURCES = \
-  modules/grpc/clickhouse/filterx/object-protobuf.h \
-  modules/grpc/clickhouse/filterx/object-protobuf-message.cpp \
-  modules/grpc/clickhouse/filterx/object-protobuf-message.hpp
+  modules/grpc/clickhouse/filterx/protobuf-message.h \
+  modules/grpc/clickhouse/filterx/protobuf-message.cpp \
+  modules/grpc/clickhouse/filterx/protobuf-message.hpp
 
 modules_grpc_clickhouse_filterx_libfilterx_la_CXXFLAGS = \
   $(AM_CXXFLAGS) \

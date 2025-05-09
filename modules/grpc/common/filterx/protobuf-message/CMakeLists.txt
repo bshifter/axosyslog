@@ -5,9 +5,9 @@ endif()
 # C++ code
 
 set(PROTOBUF_MESSAGE_CPP_SOURCES
-  object-protobuf.h
-  object-protobuf-message.cpp
-  object-protobuf-message.hpp
+  protobuf-message.h
+  protobuf-message.cpp
+  protobuf-message.hpp
 )
 
 add_module(
