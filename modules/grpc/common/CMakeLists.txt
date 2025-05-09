@@ -1,6 +1,7 @@
 add_subdirectory(credentials)
 add_subdirectory(metrics)
 add_subdirectory(schema)
+add_subdirectory(filterx)
 
 set(GRPC_COMMON_CPP_SOURCES
   ${GRPC_CREDENTIALS_SOURCES}

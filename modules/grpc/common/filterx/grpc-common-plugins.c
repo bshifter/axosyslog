@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2024 Axoflow
- * Copyright (c) 2024 Attila Szakacs <attila.szakacs@axoflow.com>
+ * Copyright (c) 2025 shifter
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published
@@ -25,32 +25,28 @@
 #include "plugin.h"
 #include "plugin-types.h"
 #include "protos/apphook.h"
+#include "protobuf-message/object-protobuf.h"
 
-extern CfgParser clickhouse_parser;
 
-static Plugin clickhouse_plugins[] =
+static Plugin grpc_plugins[] =
 {
-  {
-    .type = LL_CONTEXT_DESTINATION,
-    .name = "clickhouse",
-    .parser = &clickhouse_parser,
-  },
+  FILTERX_FUNCTION_PLUGIN(protobuf_message),
 };
 
 gboolean
-clickhouse_module_init(PluginContext *context, CfgArgs *args)
+grpc_common_plugins_module_init(PluginContext *context, CfgArgs *args)
 {
-  plugin_register(context, clickhouse_plugins, G_N_ELEMENTS(clickhouse_plugins));
+  plugin_register(context, grpc_plugins, G_N_ELEMENTS(grpc_plugins));
   grpc_register_global_initializers();
   return TRUE;
 }
 
 const ModuleInfo module_info =
 {
-  .canonical_name = "clickhouse",
+  .canonical_name = "grpc-common-plugins",
   .version = SYSLOG_NG_VERSION,
-  .description = "Clickhouse plugins",
+  .description = "GRPC Common Plugins",
   .core_revision = SYSLOG_NG_SOURCE_REVISION,
-  .plugins = clickhouse_plugins,
-  .plugins_len = G_N_ELEMENTS(clickhouse_plugins),
+  .plugins = grpc_plugins,
+  .plugins_len = G_N_ELEMENTS(grpc_plugins),
 };
