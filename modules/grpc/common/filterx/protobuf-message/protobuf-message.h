@@ -33,16 +33,7 @@
 FILTERX_FUNCTION_DECLARE(protobuf_message);
 FilterXExpr *filterx_protobuf_message_new_from_args(FilterXFunctionArgs *args, GError **error);
 
-// FILTERX_SIMPLE_FUNCTION_DECLARE(protobuf_message);
-// FilterXObject *filterx_protobuf_message_new_from_args(FilterXExpr *s, FilterXObject *args[], gsize args_len);
-
-// static inline FilterXObject *
-// filterx_protobuf_message_new(void)
-// {
-//   return filterx_protobuf_message_new_from_args(NULL, NULL, 0);
-// }
-
-FILTERX_DECLARE_TYPE(protobuf_message);
+// FILTERX_DECLARE_TYPE(protobuf_message);
 
 static inline void
 protobuf_filterx_objects_global_init(void)
@@ -51,7 +42,7 @@ protobuf_filterx_objects_global_init(void)
 
   if (!initialized)
     {
-      filterx_type_init(&FILTERX_TYPE_NAME(protobuf_message));
+      // filterx_type_init(&FILTERX_TYPE_NAME(protobuf_message));
       initialized = TRUE;
     }
 }
