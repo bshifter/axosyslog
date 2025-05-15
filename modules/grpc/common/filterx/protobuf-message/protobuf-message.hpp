@@ -35,34 +35,69 @@
 
 #include "google/protobuf/message.h"
 
-typedef struct FilterXProtobufMessage_ FilterXProtobufMessage;
+#include <string>
+#include <unordered_map>
+#include <google/protobuf/compiler/importer.h>
+#include <google/protobuf/io/zero_copy_stream.h>
 
-// FilterXObject *_filterx_protobuf_message_clone(FilterXObject *s);
+typedef struct FilterXProtobufMessage_ FilterXProtobufMessage;
 
 namespace syslogng {
 namespace grpc {
 namespace clickhouse {
 namespace filterx {
 
-class Message
+class InMemorySourceTree : public google::protobuf::compiler::SourceTree {
+  public:
+      void AddFile(const std::string& filename, const std::string& content) {
+          files_[filename] = content;
+      }
+
+      google::protobuf::io::ZeroCopyInputStream* Open(const std::string& filename) override {
+          if (files_.count(filename)) {
+              return new google::protobuf::io::ArrayInputStream(files_[filename].data(), files_[filename].size());
+          }
+          return nullptr;
+      }
+
+      std::string GetLastErrorMessage() const { return last_error_; }
+
+  private:
+      std::unordered_map<std::string, std::string> files_;
+      std::string last_error_;
+  };
+
+  class SimpleErrorCollector : public google::protobuf::compiler::MultiFileErrorCollector {
+  public:
+      void AddError(const std::string& filename, int line, int column, const std::string& message) override {
+          std::cerr << "Error in " << filename << ":" << line << ":" << column << ": " << message << std::endl;
+      }
+  };
+
+class DynamicProtoLoader
 {
 public:
-  // Message(FilterXProtobufMessage *super);
-  // Message(FilterXProtobufMessage *super, FilterXObject *protobuf_object);
-  Message(FilterXProtobufMessage *super, Schema *schema);
-  Message(Message &o) = delete;
-  Message(Message &&o) = delete;
-  // std::string marshal(void);
-  // const google::protobuf::Message &get_value() const;
-  // std::string repr() const;
+  // Constructor from .proto file path or content
+  DynamicProtoLoader(FilterXProtobufMessage *super_, const std::string& proto_content, const std::string& proto_filename = "dynamic.proto");
 
-  // bool set_attribute(const std::string &key, const std::string &value);
-  // bool set_data(const std::string &data);
+  // Constructor from schema-like map (name -> type); creates .proto dynamically
+  DynamicProtoLoader(FilterXProtobufMessage *super_, const std::string& message_name, const std::map<std::string, std::string>& schema_map);
+
+  // Instantiate a new message from loaded schema
+  std::unique_ptr<google::protobuf::Message> CreateMessageInstance() const;
+
+  // Get message descriptor
+  const google::protobuf::Descriptor* GetDescriptor() const;
+
 private:
+  std::unique_ptr<google::protobuf::compiler::Importer> importer_;
+  std::unique_ptr<google::protobuf::DynamicMessageFactory> message_factory_;
+  const google::protobuf::Descriptor* descriptor_ = nullptr;
+  std::string message_type_;
   FilterXProtobufMessage *super;
-  Schema *schema;
-  Message(const Message &o, FilterXProtobufMessage *super);
-  // friend FilterXObject *::_filterx_protobuf_message_clone(FilterXObject *s);
+
+  void LoadProtoFromString(const std::string& proto_content, const std::string& proto_filename);
+  std::string GenerateProtoFromMap(const std::string& message_name, const std::map<std::string, std::string>& schema_map);
 };
 
 }
@@ -73,7 +108,8 @@ private:
 struct FilterXProtobufMessage_
 {
   FilterXFunction super;
-  syslogng::grpc::clickhouse::filterx::Message *cpp;
+  FilterXExpr *input;
+  syslogng::grpc::clickhouse::filterx::DynamicProtoLoader *cpp;
 };
 
 #endif
