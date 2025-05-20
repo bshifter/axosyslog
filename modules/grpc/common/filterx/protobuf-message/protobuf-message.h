@@ -42,7 +42,7 @@ protobuf_filterx_objects_global_init(void)
 
   if (!initialized)
     {
-      // filterx_type_init(&FILTERX_TYPE_NAME(protobuf_message));
+      // TODO init here
       initialized = TRUE;
     }
 }
