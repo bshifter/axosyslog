@@ -48,6 +48,7 @@ private:
   void prepare_query_info(::clickhouse::grpc::QueryInfo &query_info);
   void prepare_batch();
   DestDriver *get_owner();
+  bool handle_protovar(LogMessage *msg, std::ostream& out);
 
 private:
   std::shared_ptr<::grpc::Channel> channel;

@@ -28,6 +28,7 @@
 
 using syslogng::grpc::clickhouse::DestWorker;
 using syslogng::grpc::clickhouse::DestDriver;
+using namespace google::protobuf::io;
 
 DestWorker::DestWorker(GrpcDestWorker *s)
   : syslogng::grpc::DestWorker(s)
@@ -53,6 +54,36 @@ DestWorker::should_initiate_flush()
   return this->current_batch_bytes >= this->get_owner()->batch_bytes;
 }
 
+bool
+DestWorker::handle_protovar(LogMessage *msg, std::ostream& out)
+{
+  DestDriver *owner_ = this->get_owner();
+
+  LogMessageValueType lmvt;
+  gssize len;
+  const gchar *proto = log_template_get_trivial_value_and_type(owner_->protovar, msg, &len, &lmvt);
+  if (lmvt != LM_VT_PROTOBUF)
+    {
+      msg_error("Error loggmessage type is not protobuf",
+                evt_tag_int("expected_type", LM_VT_PROTOBUF),
+                evt_tag_int("current_type", lmvt));
+      return false;
+    }
+
+    // Wrap the ostream with ZeroCopyOutputStream
+    OstreamOutputStream raw_output(&out);
+    CodedOutputStream coded_output(&raw_output);
+
+    // Write size prefix as varint
+    coded_output.WriteVarint32(len);
+
+    // Write the actual message bytes
+    coded_output.WriteRaw(proto, len);
+  return true;
+}
+
+
+
 LogThreadedResult
 DestWorker::insert(LogMessage *msg)
 {
@@ -60,31 +91,44 @@ DestWorker::insert(LogMessage *msg)
   std::streampos last_pos = this->query_data.tellp();
   size_t row_bytes = 0;
 
-  google::protobuf::Message *message = owner_->schema.format(msg, this->super->super.seq_num);
-  if (!message)
-    goto drop;
+  if (owner_->protovar)
+  {
+    if (!this->handle_protovar(msg, this->query_data))
+      return LTR_ERROR;
+    this->batch_size++;
+    row_bytes = this->query_data.tellp() - last_pos;
+    this->current_batch_bytes += row_bytes;
+    log_threaded_dest_driver_insert_msg_length_stats(this->super->super.owner, row_bytes);
 
-  this->batch_size++;
+  }
+  else
+  {
+    google::protobuf::Message *message = owner_->schema.format(msg, this->super->super.seq_num);
+    if (!message)
+      goto drop;
 
-  if (!google::protobuf::util::SerializeDelimitedToOstream(*message, &this->query_data))
-    goto drop;
+    this->batch_size++;
 
-  row_bytes = this->query_data.tellp() - last_pos;
-  this->current_batch_bytes += row_bytes;
-  log_threaded_dest_driver_insert_msg_length_stats(this->super->super.owner, row_bytes);
+    if (!google::protobuf::util::SerializeDelimitedToOstream(*message, &this->query_data))
+      goto drop;
 
-  msg_trace("Message added to ClickHouse batch", log_pipe_location_tag(&this->super->super.owner->super.super.super));
+    row_bytes = this->query_data.tellp() - last_pos;
+    this->current_batch_bytes += row_bytes;
+    log_threaded_dest_driver_insert_msg_length_stats(this->super->super.owner, row_bytes);
 
-  delete message;
+    msg_trace("Message added to ClickHouse batch", log_pipe_location_tag(&this->super->super.owner->super.super.super));
 
-  if (!this->client_context.get())
-    {
-      this->client_context = std::make_unique<::grpc::ClientContext>();
-      prepare_context_dynamic(*this->client_context, msg);
-    }
+    delete message;
 
-  if (this->should_initiate_flush())
-    return log_threaded_dest_worker_flush(&this->super->super, LTF_FLUSH_NORMAL);
+    if (!this->client_context.get())
+      {
+        this->client_context = std::make_unique<::grpc::ClientContext>();
+        prepare_context_dynamic(*this->client_context, msg);
+      }
+
+    if (this->should_initiate_flush())
+      return log_threaded_dest_worker_flush(&this->super->super, LTF_FLUSH_NORMAL);
+  }
 
   return LTR_QUEUED;
 
@@ -180,6 +224,7 @@ DestWorker::flush(LogThreadedFlushMode mode)
 
   this->prepare_query_info(query_info);
 
+  std::cout << "DEBUG>> queryinfo" << query_info.DebugString() << std::endl;
   ::grpc::Status status = this->stub->ExecuteQuery(this->client_context.get(), query_info, &query_result);
 
   LogThreadedResult result;

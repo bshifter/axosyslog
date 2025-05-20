@@ -37,6 +37,7 @@ void clickhouse_dd_set_table(LogDriver *d, const gchar *table);
 void clickhouse_dd_set_user(LogDriver *d, const gchar *user);
 void clickhouse_dd_set_password(LogDriver *d, const gchar *password);
 void clickhouse_dd_set_server_side_schema(LogDriver *d, const gchar *server_side_schema);
+gboolean clickhouse_dd_set_protovar(LogDriver *d, LogTemplate *proto);
 
 #include "compat/cpp-end.h"
 

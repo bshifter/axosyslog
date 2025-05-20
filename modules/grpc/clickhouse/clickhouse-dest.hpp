@@ -97,6 +97,11 @@ public:
     return &this->schema;
   }
 
+  void set_protovar(LogTemplate *d)
+  {
+    this->protovar = log_template_ref(d);
+  }
+
 private:
   static bool map_schema_type(const std::string &type_in, google::protobuf::FieldDescriptorProto::Type &type_out);
   bool quote_identifier(const std::string &identifier, std::string &quoted_identifier);
@@ -111,6 +116,8 @@ private:
   std::string password;
   std::string server_side_schema;
   std::string query;
+
+  LogTemplate *protovar = nullptr;
 
   Schema schema;
 };
