@@ -295,6 +295,16 @@ _bytes_marshal(FilterXObject *s, GString *repr, LogMessageValueType *t)
 }
 
 static gboolean
+_protobuf_marshal(FilterXObject *s, GString *repr, LogMessageValueType *t)
+{
+  FilterXString *self = (FilterXString *) s;
+
+  g_string_append_len(repr, self->str, self->str_len);
+  *t = LM_VT_PROTOBUF;
+  return TRUE;
+}
+
+static gboolean
 _bytes_repr(FilterXObject *s, GString *repr)
 {
   FilterXString *self = (FilterXString *) s;
@@ -449,7 +459,7 @@ FILTERX_DEFINE_TYPE(bytes, FILTERX_TYPE_NAME(object),
 
 FILTERX_DEFINE_TYPE(protobuf, FILTERX_TYPE_NAME(object),
                     .len = _len,
-                    .marshal = _bytes_marshal,
+                    .marshal = _protobuf_marshal,
                     .format_json = _bytes_format_json,
                     .truthy = _truthy,
                     .repr = _bytes_repr,
