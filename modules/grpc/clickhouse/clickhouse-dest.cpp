@@ -62,7 +62,7 @@ DestDriver::init()
   if (!this->schema.init())
     return false;
 
-  if (this->schema.empty())
+  if (this->schema.empty() && this->protovar == nullptr)
     {
       msg_error("Error initializing ClickHouse destination, schema() or protobuf-schema() is empty",
                 log_pipe_location_tag(&this->super->super.super.super.super));
@@ -339,6 +339,18 @@ clickhouse_dd_set_password(LogDriver *d, const gchar *password)
   GrpcDestDriver *self = (GrpcDestDriver *) d;
   DestDriver *cpp = clickhouse_dd_get_cpp(self);
   cpp->set_password(password);
+}
+
+gboolean
+clickhouse_dd_set_protovar(LogDriver *d, LogTemplate *proto)
+{
+  if (!log_template_is_trivial(proto))
+    return FALSE;
+
+  GrpcDestDriver *self = (GrpcDestDriver *) d;
+  DestDriver *cpp = clickhouse_dd_get_cpp(self);
+  cpp->set_protovar(proto);
+  return TRUE;
 }
 
 LogDriver *
