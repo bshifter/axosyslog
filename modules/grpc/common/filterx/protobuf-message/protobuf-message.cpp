@@ -36,6 +36,7 @@
 #include "compat/cpp-end.h"
 
 #include <google/protobuf/util/json_util.h>
+#include "schema.hpp"
 
 #include <unistd.h>
 #include <cstdio>
@@ -45,110 +46,35 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
+#include <limits.h>     // for PATH_MAX
 
-using namespace syslogng::grpc::clickhouse::filterx;
+using namespace syslogng::grpc::common;
+using namespace syslogng::grpc::common::filterx;
 using namespace google::protobuf;
 using namespace google::protobuf::compiler;
 
 /* C++ Implementations */
 
-DynamicProtoLoader::DynamicProtoLoader(FilterXProtobufMessage *super_, const std::string& proto_content, const std::string& proto_filename) : super(super_)
+DynamicProtoLoader::DynamicProtoLoader(FilterXProtobufMessage *super_,
+  const std::string& message_name,
+  const std::map<std::string, std::string>& schema_map)
+: super(super_), _schema("example", message_name)
 {
-  LoadProtoFromString(proto_content, proto_filename);
+// TODO: now use schema_map to add fields to schema
 }
 
-DynamicProtoLoader::DynamicProtoLoader(FilterXProtobufMessage *super_, const std::string& message_name, const std::map<std::string, std::string>& schema_map) : super(super_)
+DynamicProtoLoader::DynamicProtoLoader(FilterXProtobufMessage *super_,
+  const std::string& proto_content,
+  const std::string& proto_filename)
+: super(super_), _schema(proto_content)
 {
-  std::string proto = GenerateProtoFromMap(message_name, schema_map);
-  LoadProtoFromString(proto, "generated.proto");
+// schema is now initialized
 }
 
-std::string
-DynamicProtoLoader::GenerateProtoFromMap(const std::string& message_name, const std::map<std::string, std::string>& schema_map)
-{
-  std::ostringstream ss;
-  ss << "syntax = \"proto3\";\n";
-  ss << "package dynamic;\n";
-  ss << "message " << message_name << " {\n";
-  int field_number = 1;
-  for (const auto& pair : schema_map) {
-      ss << "  " << pair.second << " " << pair.first << " = " << field_number++ << ";\n";
-  }
-  ss << "}\n";
-  message_type_ = "dynamic." + message_name;
-  return ss.str();
+Schema&
+DynamicProtoLoader::getSchema() {
+  return _schema;
 }
-
-void
-DynamicProtoLoader::LoadProtoFromString(const std::string& proto_content, const std::string& proto_filename)
-{
-  auto source_tree = std::make_unique<InMemorySourceTree>();
-  source_tree->AddFile(proto_filename, proto_content);
-
-  auto error_collector = std::make_unique<SimpleErrorCollector>();
-  importer_ = std::make_unique<Importer>(source_tree.get(), error_collector.get());
-
-  const FileDescriptor* file_desc = importer_->Import(proto_filename);
-  if (!file_desc) {
-      throw std::runtime_error("Failed to import proto file: " + proto_filename);
-  }
-
-  if (message_type_.empty()) {
-      if (file_desc->message_type_count() == 0)
-          throw std::runtime_error("No message types found in proto file.");
-      message_type_ = file_desc->package() + "." + file_desc->message_type(0)->name();
-  }
-
-  descriptor_ = importer_->pool()->FindMessageTypeByName(message_type_);
-  if (!descriptor_) {
-      throw std::runtime_error("Could not find message type: " + message_type_);
-  }
-
-  message_factory_ = std::make_unique<DynamicMessageFactory>(importer_->pool());
-}
-
-std::unique_ptr<Message>
-DynamicProtoLoader::CreateMessageInstance() const
-{
-  if (!descriptor_) return nullptr;
-  const Message* prototype = message_factory_->GetPrototype(descriptor_);
-  if (!prototype) return nullptr;
-  return std::unique_ptr<Message>(prototype->New());
-}
-
-const Descriptor*
-DynamicProtoLoader::GetDescriptor() const
-{
-  return descriptor_;
-}
-
-// google::protobuf::FieldDescriptorProto::Type
-// TypeFromString(const std::string& type_str)
-// {
-//   static const std::map<std::string, google::protobuf::FieldDescriptorProto::Type> type_map = {
-//       {"double", google::protobuf::FieldDescriptorProto::TYPE_DOUBLE},
-//       {"float", google::protobuf::FieldDescriptorProto::TYPE_FLOAT},
-//       {"int64", google::protobuf::FieldDescriptorProto::TYPE_INT64},
-//       {"uint64", google::protobuf::FieldDescriptorProto::TYPE_UINT64},
-//       {"int32", google::protobuf::FieldDescriptorProto::TYPE_INT32},
-//       {"fixed64", google::protobuf::FieldDescriptorProto::TYPE_FIXED64},
-//       {"fixed32", google::protobuf::FieldDescriptorProto::TYPE_FIXED32},
-//       {"bool", google::protobuf::FieldDescriptorProto::TYPE_BOOL},
-//       {"string", google::protobuf::FieldDescriptorProto::TYPE_STRING},
-//       {"bytes", google::protobuf::FieldDescriptorProto::TYPE_BYTES},
-//       {"uint32", google::protobuf::FieldDescriptorProto::TYPE_UINT32},
-//       {"sfixed32", google::protobuf::FieldDescriptorProto::TYPE_SFIXED32},
-//       {"sfixed64", google::protobuf::FieldDescriptorProto::TYPE_SFIXED64},
-//       {"sint32", google::protobuf::FieldDescriptorProto::TYPE_SINT32},
-//       {"sint64", google::protobuf::FieldDescriptorProto::TYPE_SINT64},
-//   };
-
-//   auto it = type_map.find(type_str);
-//   if (it != type_map.end()) {
-//       return it->second;
-//   }
-//   throw std::invalid_argument("Unknown protobuf type: " + type_str);
-// }
 
 // /* C Wrappers */
 
@@ -172,12 +98,36 @@ _eval(FilterXExpr *s)
     return NULL;
   }
 
-  auto msg = self->cpp->CreateMessageInstance();
+  auto msg = self->cpp->getSchema().createMessageInstance();
   const Reflection *reflection = msg->GetReflection();
   const Descriptor *descriptor = msg->GetDescriptor();
 
-  const FieldDescriptor* name_field = descriptor->FindFieldByName("name");
-  reflection->SetString(msg.get(), name_field, "Alice");
+  // DEBUG
+  const FieldDescriptor* id_field = descriptor->FindFieldByName("id");
+  reflection->SetInt32(msg.get(), id_field, 447);
+  const FieldDescriptor* foobar_field = descriptor->FindFieldByName("foobar");
+  if (!foobar_field || foobar_field->cpp_type() != FieldDescriptor::CPPTYPE_MESSAGE || !foobar_field->is_repeated()) {
+      throw std::runtime_error("Invalid or missing 'foobar' field.");
+  }
+
+  const Descriptor* nested_desc = foobar_field->message_type();
+  const FieldDescriptor* foo_field = nested_desc->FindFieldByName("foo");
+  const FieldDescriptor* bar_field = nested_desc->FindFieldByName("bar");
+
+  if (!foo_field || !bar_field) {
+      throw std::runtime_error("Missing 'foo' or 'bar' field in nested message.");
+  }
+
+  Message* entry = reflection->AddMessage(msg.get(), foobar_field);
+  const Reflection* entry_reflection = entry->GetReflection();
+  entry_reflection->SetString(entry, foo_field, "foo1");
+  entry_reflection->SetString(entry, bar_field, "bar1");
+  Message* entry2 = reflection->AddMessage(msg.get(), foobar_field);
+  const Reflection* entry_reflection2 = entry2->GetReflection();
+  entry_reflection2->SetString(entry2, foo_field, "foo2");
+  entry_reflection2->SetString(entry2, bar_field, "bar2");
+
+  // EO DEBUG
 
   std::cout << msg->DebugString() << std::endl;
 
@@ -227,12 +177,23 @@ _free(FilterXExpr *s)
   filterx_function_free_method(&self->super);
 }
 
-std::string
-_readFile(const std::string& filename) {
-  std::ifstream file(filename);
-  std::ostringstream ss;
-  ss << file.rdbuf();
-  return ss.str();
+std::string _readFile(const std::string& filename) {
+    std::ifstream file(filename, std::ios::in | std::ios::binary);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open file: " + filename);
+    }
+
+    std::ostringstream ss;
+    ss << file.rdbuf();
+
+    if (file.fail() && !file.eof()) {
+        throw std::runtime_error("Error reading from file: " + filename);
+    }
+
+    std::string content = ss.str();
+
+    return content;
 }
 
 static gboolean
@@ -257,7 +218,16 @@ _extract_args(FilterXProtobufMessage *self, FilterXFunctionArgs *args, GError **
     const gchar* proto_filename = filterx_function_args_get_named_literal_string(args, FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE, NULL, &exists);
     if (exists && proto_filename != NULL) {
       std::string file_name(proto_filename);
-      self->cpp = new DynamicProtoLoader(self, _readFile(file_name), file_name);
+      try
+        {
+          self->cpp = new DynamicProtoLoader(self, _readFile(file_name), file_name);
+          self->cpp->getSchema().finalize();
+        }
+      catch(const std::exception &ex)
+        {
+          msg_error("protobuf-message: failed to load protobuf:", evt_tag_str("message", ex.what()));
+          return FALSE;
+        }
     } else {
 
       FilterXExpr *fx_schema = filterx_function_args_get_named_expr(args, FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA);
@@ -300,7 +270,6 @@ _extract_args(FilterXProtobufMessage *self, FilterXFunctionArgs *args, GError **
       std::map<std::string, std::string> schema;
       self->cpp = new DynamicProtoLoader(self, "User", schema);
     }
-
 
     return TRUE;
 }
