@@ -138,8 +138,6 @@ _eval(FilterXExpr *s)
     }
 
   auto msg = self->cpp->getSchema().createMessageInstance();
-  // const Reflection *reflection = msg->GetReflection();
-  // const Descriptor *descriptor = msg->GetDescriptor();
 
 
   gpointer user_data = static_cast<gpointer>(msg.get());
@@ -147,8 +145,12 @@ _eval(FilterXExpr *s)
   if (!iter_res)
     return NULL;
 
+
+
   // // DEBUG
   // //// foobar (map, working)
+  // const Reflection *reflection = msg->GetReflection();
+  // const Descriptor *descriptor = msg->GetDescriptor();
   // const google::protobuf::FieldDescriptor* map_field = descriptor->FindFieldByName("foobar");
   // if (!map_field || map_field->is_map() == false) {
   //   throw std::runtime_error("foobar is not a map field!");
@@ -170,6 +172,8 @@ _eval(FilterXExpr *s)
   // entry_reflection->SetString(entry_message, value_field, "bar1");
 
   ///// foobar (nested, working)
+  // const Reflection *reflection = msg->GetReflection();
+  // const Descriptor *descriptor = msg->GetDescriptor();
   // const FieldDescriptor* foobar_field = descriptor->FindFieldByName("foobar");
   // if (!foobar_field || foobar_field->cpp_type() != FieldDescriptor::CPPTYPE_MESSAGE || !foobar_field->is_repeated()) {
   //     throw std::runtime_error("Invalid or missing 'foobar' field.");
@@ -192,9 +196,21 @@ _eval(FilterXExpr *s)
   // entry_reflection2->SetString(entry2, foo_field, "foo2");
   // entry_reflection2->SetString(entry2, bar_field, "bar2");
 
+
+  // array
+  // const Reflection *reflection = msg->GetReflection();
+  // const Descriptor *descriptor = msg->GetDescriptor();
+  // const google::protobuf::FieldDescriptor* arr_field = descriptor->FindFieldByName("arr");
+
+  // std::cout << "DEBUG>> field debugstring: " << arr_field->DebugString() << std::endl;
+  // std::cout << "DEBUG>> field type: " << arr_field->type() << std::endl;
+  // std::cout << "DEBUG>> field type_name: " << arr_field->type_name() << std::endl;
+
+  // reflection->AddString(msg.get(), arr_field, "");
+
   // EO DEBUG
 
-  std::cout << msg->DebugString() << std::endl;
+  std::cout << "DEBUG>> message debugstring: " << msg->DebugString() << std::endl;
 
   std::string protobuf_string = msg->SerializeAsString();
 

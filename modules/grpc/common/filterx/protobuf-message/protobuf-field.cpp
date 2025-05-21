@@ -253,6 +253,7 @@ success:
   }
 };
 
+
 class DoubleField : public ProtobufField
 {
 public:
@@ -376,8 +377,8 @@ public:
 
     return TRUE;
   }
-class MessageField : public ProtobufField
-{
+
+class MapField : public ProtobufField {
 public:
   FilterXObject *FilterXObjectGetter(google::protobuf::Message *message, ProtoReflectors reflectors)
   {
@@ -387,60 +388,51 @@ public:
   bool FilterXObjectSetter(google::protobuf::Message *message, ProtoReflectors reflectors, FilterXObject *object,
                            FilterXObject **assoc_object)
   {
-    if (reflectors.fieldDescriptor->is_map()) {
-      // std::unique_ptr<ProtobufField> mf = std::make_unique<MapField>();
-      // return mf->Set(message, reflectors.fieldDescriptor->name(), object, assoc_object);
-       if (!object) {
-          return false;
-        }
-        FilterXObject *dict = filterx_ref_unwrap_ro(object);
-        if (!filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict))) {
-          return false;
-        }
+    if (!object) {
+      return false;
+    }
+    FilterXObject *dict = filterx_ref_unwrap_ro(object);
+    if (!filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict))) {
+      return false;
+    }
 
-        gpointer user_data[] = {
-          static_cast<gpointer>(message),
-          static_cast<gpointer>(&reflectors),
-        };
-        gboolean iter_res = filterx_dict_iter(dict, _pbf_dict_iterator, user_data);
-        if (!iter_res)
-          return false;
-
-
-        return true;
+    gpointer user_data[] = {
+      static_cast<gpointer>(message),
+      static_cast<gpointer>(&reflectors),
     };
-    throw std::logic_error("MessageField::unknown message type");
+    gboolean iter_res = filterx_dict_iter(dict, _pbf_dict_iterator, user_data);
+    if (!iter_res)
+      return false;
+
+    return true;
+  }
+};
+
+class MessageField : public ProtobufField
+{
+private:
+  std::unique_ptr<ProtobufField> inner;
+public:
+  FilterXObject *FilterXObjectGetter(google::protobuf::Message *message, ProtoReflectors reflectors)
+  {
+    throw std::logic_error("ProtobufField: not yet implemented");
+    return NULL;
+  }
+  bool FilterXObjectSetter(google::protobuf::Message *message, ProtoReflectors reflectors, FilterXObject *object,
+                           FilterXObject **assoc_object)
+  {
+    if (reflectors.fieldDescriptor->is_map())
+    {
+      inner = std::make_unique<MapField>();
+    }
+
+    if (!inner) {
+      throw std::logic_error("ProtobufField: unknown TYPE_MESSAGE handler");
+    }
+    return inner->FilterXObjectSetter(message, reflectors, object, assoc_object);
   }
 
 };
-
-// class MapField : public ProtobufField {
-// public:
-//   FilterXObject *FilterXObjectGetter(google::protobuf::Message *message, ProtoReflectors reflectors)
-//   {
-//     throw std::logic_error("not yet implemented");
-//     return NULL;
-//   }
-//   bool FilterXObjectSetter(google::protobuf::Message *message, ProtoReflectors reflectors, FilterXObject *object,
-//                            FilterXObject **assoc_object)
-//   {
-//     if (!object) {
-//       return false;
-//     }
-//     FilterXObject *dict = filterx_ref_unwrap_ro(object);
-//     if (!filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict))) {
-//       return false;
-//     }
-
-//     gpointer user_data = static_cast<gpointer>(message);
-//     gboolean iter_res = filterx_dict_iter(dict, _dict_iterator, user_data);
-//     if (!iter_res)
-//       return false;
-
-
-//     return true;
-//   }
-// };
 
 std::unique_ptr<ProtobufField> *syslogng::grpc::common::all_protobuf_converters()
 {

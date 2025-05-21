@@ -148,7 +148,7 @@ public:
   }
 
   virtual ~ProtobufField() {}
-protected:
+// protected:
   virtual FilterXObject *FilterXObjectGetter(google::protobuf::Message *message, ProtoReflectors reflectors) = 0;
   virtual bool FilterXObjectSetter(google::protobuf::Message *message, ProtoReflectors reflectors,
                                    FilterXObject *object, FilterXObject **assoc_object) = 0;
