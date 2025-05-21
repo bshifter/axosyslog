@@ -29,6 +29,7 @@
 #include "filterx/object-string.h"
 #include "filterx/object-datetime.h"
 #include "filterx/object-primitive.h"
+#include "filterx/filterx-eval.h"
 #include "filterx/expr-literal-generator.h"
 #include "scratch-buffers.h"
 #include "generic-number.h"
@@ -37,6 +38,8 @@
 
 #include <google/protobuf/util/json_util.h>
 #include "schema.hpp"
+#include "protobuf-field.hpp"
+#include "logmsg/logmsg.h"
 
 #include <unistd.h>
 #include <cstdio>
@@ -82,56 +85,118 @@ DynamicProtoLoader::getSchema() {
 #define FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA "schema"
 
 #define FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE "Usage: protobuf_message({dict}, [" \
-FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA"={dict}," \
+FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA"={dict}(not yet implemented)," \
 FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE"={string literal}])"
+
+gboolean _dict_iterator(FilterXObject *key, FilterXObject *value, gpointer user_data)
+{
+
+  // TODO: check if key is real string
+  GString *v = scratch_buffers_alloc();
+  filterx_object_repr(value, v);
+  try
+  {
+    auto* msg = static_cast<google::protobuf::Message*>(user_data);
+    std::string field_name = extract_string_from_object(key);
+    ProtoReflectors reflectors(*msg, field_name);
+    ProtobufField *pbf = protobuf_converter_by_type(reflectors.fieldType);
+
+    FilterXObject *assoc_object = NULL;
+    if (!pbf->Set(msg, field_name, value, &assoc_object))
+    {
+      return FALSE;
+    }
+    std::cout << "DEBUG>> dict iterator: " << "key:" << field_name << "|val:" << std::string(v->str) << std::endl;
+  }
+  catch (const std::exception &e)
+    {
+      msg_error("dict iteration error",
+                evt_tag_str("error", e.what()));
+      return FALSE;
+    }
+
+  return TRUE;
+}
 
 static FilterXObject *
 _eval(FilterXExpr *s)
 {
   FilterXProtobufMessage *self = (FilterXProtobufMessage *) s;
 
-  FilterXObject *data = filterx_expr_eval(self->input);
-  FilterXObject *dict = filterx_ref_unwrap_ro(data);
-
-  if (!filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict))) {
-    // TODO: log error
+  FilterXObject *input = filterx_expr_eval(self->input);
+  if (!input)
+  {
     return NULL;
   }
 
+  FilterXObject *dict = filterx_ref_unwrap_ro(input);
+  if (!filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict)))
+    {
+      filterx_eval_push_error_info("object must be a dict", self->input,
+                                   g_strdup_printf("got %s instead", dict->type->name), TRUE);
+      return NULL;
+    }
+
   auto msg = self->cpp->getSchema().createMessageInstance();
-  const Reflection *reflection = msg->GetReflection();
-  const Descriptor *descriptor = msg->GetDescriptor();
+  // const Reflection *reflection = msg->GetReflection();
+  // const Descriptor *descriptor = msg->GetDescriptor();
 
-  // DEBUG
-  const FieldDescriptor* id_field = descriptor->FindFieldByName("id");
-  reflection->SetInt32(msg.get(), id_field, 447);
-  const FieldDescriptor* foobar_field = descriptor->FindFieldByName("foobar");
-  if (!foobar_field || foobar_field->cpp_type() != FieldDescriptor::CPPTYPE_MESSAGE || !foobar_field->is_repeated()) {
-      throw std::runtime_error("Invalid or missing 'foobar' field.");
-  }
 
-  const Descriptor* nested_desc = foobar_field->message_type();
-  const FieldDescriptor* foo_field = nested_desc->FindFieldByName("foo");
-  const FieldDescriptor* bar_field = nested_desc->FindFieldByName("bar");
+  gpointer user_data = static_cast<gpointer>(msg.get());
+  gboolean iter_res = filterx_dict_iter(dict, _dict_iterator, user_data);
+  if (!iter_res)
+    return NULL;
 
-  if (!foo_field || !bar_field) {
-      throw std::runtime_error("Missing 'foo' or 'bar' field in nested message.");
-  }
+  // // DEBUG
+  // //// foobar (map, working)
+  // const google::protobuf::FieldDescriptor* map_field = descriptor->FindFieldByName("foobar");
+  // if (!map_field || map_field->is_map() == false) {
+  //   throw std::runtime_error("foobar is not a map field!");
+  // }
 
-  Message* entry = reflection->AddMessage(msg.get(), foobar_field);
-  const Reflection* entry_reflection = entry->GetReflection();
-  entry_reflection->SetString(entry, foo_field, "foo1");
-  entry_reflection->SetString(entry, bar_field, "bar1");
-  Message* entry2 = reflection->AddMessage(msg.get(), foobar_field);
-  const Reflection* entry_reflection2 = entry2->GetReflection();
-  entry_reflection2->SetString(entry2, foo_field, "foo2");
-  entry_reflection2->SetString(entry2, bar_field, "bar2");
+  // std::cout << "map field debugstring:" << map_field->DebugString() << std::endl;
+  // std::cout << "map field type:" << map_field->type() << std::endl;
+  // std::cout << "map field typename:" << map_field->type_name() << std::endl;
+  // std::cout << "map field cpptype:" << map_field->cpp_type() << std::endl;
+
+  // Message* entry_message = reflection->AddMessage(msg.get(), map_field);
+  // const Descriptor* entry_descriptor = entry_message->GetDescriptor();
+  // const Reflection* entry_reflection = entry_message->GetReflection();
+
+  // const FieldDescriptor* key_field = entry_descriptor->FindFieldByName("key");
+  // const FieldDescriptor* value_field = entry_descriptor->FindFieldByName("value");
+
+  // entry_reflection->SetString(entry_message, key_field, "foo1");
+  // entry_reflection->SetString(entry_message, value_field, "bar1");
+
+  ///// foobar (nested, working)
+  // const FieldDescriptor* foobar_field = descriptor->FindFieldByName("foobar");
+  // if (!foobar_field || foobar_field->cpp_type() != FieldDescriptor::CPPTYPE_MESSAGE || !foobar_field->is_repeated()) {
+  //     throw std::runtime_error("Invalid or missing 'foobar' field.");
+  // }
+
+  // const Descriptor* nested_desc = foobar_field->message_type();
+  // const FieldDescriptor* foo_field = nested_desc->FindFieldByName("foo");
+  // const FieldDescriptor* bar_field = nested_desc->FindFieldByName("bar");
+
+  // if (!foo_field || !bar_field) {
+  //     throw std::runtime_error("Missing 'foo' or 'bar' field in nested message.");
+  // }
+
+  // Message* entry = reflection->AddMessage(msg.get(), foobar_field);
+  // const Reflection* entry_reflection = entry->GetReflection();
+  // entry_reflection->SetString(entry, foo_field, "foo1");
+  // entry_reflection->SetString(entry, bar_field, "bar1");
+  // Message* entry2 = reflection->AddMessage(msg.get(), foobar_field);
+  // const Reflection* entry_reflection2 = entry2->GetReflection();
+  // entry_reflection2->SetString(entry2, foo_field, "foo2");
+  // entry_reflection2->SetString(entry2, bar_field, "bar2");
 
   // EO DEBUG
 
   std::cout << msg->DebugString() << std::endl;
 
-  std::string protobuf_string = msg->SerializePartialAsString();
+  std::string protobuf_string = msg->SerializeAsString();
 
   return filterx_protobuf_new(protobuf_string.c_str(), protobuf_string.length());
 }
@@ -229,6 +294,9 @@ _extract_args(FilterXProtobufMessage *self, FilterXFunctionArgs *args, GError **
           return FALSE;
         }
     } else {
+        g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
+          "not yet implemented! " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
+        return FALSE;
 
       FilterXExpr *fx_schema = filterx_function_args_get_named_expr(args, FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA);
       if (!fx_schema) {
@@ -243,30 +311,6 @@ _extract_args(FilterXProtobufMessage *self, FilterXFunctionArgs *args, GError **
           return FALSE;
       }
 
-      // if (!filterx_expr_is_literal_list_generator(targets))
-      //   {
-      //     g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
-      //                 FILTERX_FUNC_UNSET_EMPTIES_ARG_NAME_TARGETS" argument must be literal list. " FILTERX_FUNC_UNSET_EMPTIES_USAGE);
-      //     return FALSE;
-      //   }
-
-      // FilterXObject *fx_schema = filterx_function_args_get_named_literal_object(args, FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA, &exists);
-      // if (!exists) {
-      //   g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
-      //     "one of '" FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE "' or '" FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA "' arguments must be set. " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
-      //   return FALSE;
-      // }
-      // if (!fx_schema) {
-      //   g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
-      //     FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA " must be a dict literal. " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
-      //     return FALSE;
-      // }
-      // FilterXObject *dict = filterx_ref_unwrap_ro(fx_schema);
-      // if (!filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict))) {
-      //   g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
-      //     FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA " must be a dict literal. " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
-      //   return FALSE;
-      // }
       std::map<std::string, std::string> schema;
       self->cpp = new DynamicProtoLoader(self, "User", schema);
     }
