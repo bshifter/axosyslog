@@ -54,6 +54,27 @@ DestWorker::should_initiate_flush()
   return this->current_batch_bytes >= this->get_owner()->batch_bytes;
 }
 
+#include <iostream>
+#include <iomanip>
+#include <string>
+
+void hexdump(const std::string& data) {
+    std::ios oldState(nullptr);
+    oldState.copyfmt(std::cout);  // Save cout formatting
+
+    for (size_t i = 0; i < data.size(); ++i) {
+        if (i > 0 && i % 16 == 0)
+            std::cout << '\n';  // Newline every 16 bytes
+
+        std::cout << std::hex << std::setw(2) << std::setfill('0')
+                  << (static_cast<unsigned int>(static_cast<unsigned char>(data[i]))) << " ";
+    }
+
+    std::cout << std::endl;
+
+    std::cout.copyfmt(oldState);  // Restore cout formatting
+}
+
 bool
 DestWorker::handle_protovar(LogMessage *msg, std::ostream& out)
 {
@@ -70,18 +91,21 @@ DestWorker::handle_protovar(LogMessage *msg, std::ostream& out)
       return false;
     }
 
+    std::string p(proto, len);
+    std::cout << "raw proto:" << std::endl;
+    hexdump(p);
+
     // Wrap the ostream with ZeroCopyOutputStream
     OstreamOutputStream raw_output(&out);
     CodedOutputStream coded_output(&raw_output);
 
-    // Write size prefix as varint
+    // // Write size prefix as varint
     coded_output.WriteVarint32(len);
 
     // Write the actual message bytes
     coded_output.WriteRaw(proto, len);
   return true;
 }
-
 
 
 LogThreadedResult
@@ -99,6 +123,7 @@ DestWorker::insert(LogMessage *msg)
     row_bytes = this->query_data.tellp() - last_pos;
     this->current_batch_bytes += row_bytes;
     log_threaded_dest_driver_insert_msg_length_stats(this->super->super.owner, row_bytes);
+    msg_trace("Message added to ClickHouse batch", log_pipe_location_tag(&this->super->super.owner->super.super.super));
 
   }
   else
@@ -119,16 +144,16 @@ DestWorker::insert(LogMessage *msg)
     msg_trace("Message added to ClickHouse batch", log_pipe_location_tag(&this->super->super.owner->super.super.super));
 
     delete message;
-
-    if (!this->client_context.get())
-      {
-        this->client_context = std::make_unique<::grpc::ClientContext>();
-        prepare_context_dynamic(*this->client_context, msg);
-      }
-
-    if (this->should_initiate_flush())
-      return log_threaded_dest_worker_flush(&this->super->super, LTF_FLUSH_NORMAL);
   }
+
+  if (!this->client_context.get())
+    {
+      this->client_context = std::make_unique<::grpc::ClientContext>();
+      prepare_context_dynamic(*this->client_context, msg);
+    }
+
+  if (this->should_initiate_flush())
+    return log_threaded_dest_worker_flush(&this->super->super, LTF_FLUSH_NORMAL);
 
   return LTR_QUEUED;
 
@@ -225,6 +250,7 @@ DestWorker::flush(LogThreadedFlushMode mode)
   this->prepare_query_info(query_info);
 
   std::cout << "DEBUG>> queryinfo" << query_info.DebugString() << std::endl;
+
   ::grpc::Status status = this->stub->ExecuteQuery(this->client_context.get(), query_info, &query_result);
 
   LogThreadedResult result;
