@@ -334,10 +334,113 @@ public:
         return true;
       }
 
-    log_type_error(reflectors, object->type->name);
-    return false;
+      log_type_error(reflectors, object->type->name);
+      return false;
+    }
+  };
+
+
+  gboolean _pbf_dict_iterator(FilterXObject *key, FilterXObject *value, gpointer user_data)
+  {
+    try
+    {
+      const gchar *key_name = "key";
+      const gchar *val_name = "value";
+      google::protobuf::Message* msg = static_cast<google::protobuf::Message*>(((gpointer *)user_data)[0]);
+      ProtoReflectors *prevreflectors = static_cast<ProtoReflectors*>(((gpointer *)user_data)[1]);
+      // std::string field_name = extract_string_from_object(key);
+      Message* entry_message = prevreflectors->reflection->AddMessage(msg, prevreflectors->fieldDescriptor);
+      ProtoReflectors key_reflectors(*entry_message, key_name);
+      ProtoReflectors val_reflectors(*entry_message, val_name);
+
+      ProtobufField *pbf_key = protobuf_converter_by_type(key_reflectors.fieldType);
+      ProtobufField *pbf_val = protobuf_converter_by_type(val_reflectors.fieldType);
+
+      FilterXObject *assoc_key_object = NULL;
+      if (!pbf_key->Set(entry_message, key_name, key, &assoc_key_object))
+      {
+        return FALSE;
+      };
+      FilterXObject *assoc_val_object = NULL;
+      if (!pbf_val->Set(entry_message, val_name, value, &assoc_val_object))
+      {
+        return FALSE;
+      };
+    }
+    catch (const std::exception &e)
+      {
+        msg_error("dict iteration error",
+                  evt_tag_str("error", e.what()));
+        return FALSE;
+      }
+
+    return TRUE;
   }
+class MessageField : public ProtobufField
+{
+public:
+  FilterXObject *FilterXObjectGetter(google::protobuf::Message *message, ProtoReflectors reflectors)
+  {
+    throw std::logic_error("not yet implemented");
+    return NULL;
+  }
+  bool FilterXObjectSetter(google::protobuf::Message *message, ProtoReflectors reflectors, FilterXObject *object,
+                           FilterXObject **assoc_object)
+  {
+    if (reflectors.fieldDescriptor->is_map()) {
+      // std::unique_ptr<ProtobufField> mf = std::make_unique<MapField>();
+      // return mf->Set(message, reflectors.fieldDescriptor->name(), object, assoc_object);
+       if (!object) {
+          return false;
+        }
+        FilterXObject *dict = filterx_ref_unwrap_ro(object);
+        if (!filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict))) {
+          return false;
+        }
+
+        gpointer user_data[] = {
+          static_cast<gpointer>(message),
+          static_cast<gpointer>(&reflectors),
+        };
+        gboolean iter_res = filterx_dict_iter(dict, _pbf_dict_iterator, user_data);
+        if (!iter_res)
+          return false;
+
+
+        return true;
+    };
+    throw std::logic_error("MessageField::unknown message type");
+  }
+
 };
+
+// class MapField : public ProtobufField {
+// public:
+//   FilterXObject *FilterXObjectGetter(google::protobuf::Message *message, ProtoReflectors reflectors)
+//   {
+//     throw std::logic_error("not yet implemented");
+//     return NULL;
+//   }
+//   bool FilterXObjectSetter(google::protobuf::Message *message, ProtoReflectors reflectors, FilterXObject *object,
+//                            FilterXObject **assoc_object)
+//   {
+//     if (!object) {
+//       return false;
+//     }
+//     FilterXObject *dict = filterx_ref_unwrap_ro(object);
+//     if (!filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict))) {
+//       return false;
+//     }
+
+//     gpointer user_data = static_cast<gpointer>(message);
+//     gboolean iter_res = filterx_dict_iter(dict, _dict_iterator, user_data);
+//     if (!iter_res)
+//       return false;
+
+
+//     return true;
+//   }
+// };
 
 std::unique_ptr<ProtobufField> *syslogng::grpc::common::all_protobuf_converters()
 {
@@ -357,7 +460,7 @@ std::unique_ptr<ProtobufField> *syslogng::grpc::common::all_protobuf_converters(
     std::make_unique<BoolField>(),    //TYPE_BOOL = 8,      // bool, varint on the wire.
     std::make_unique<StringField>(),  //TYPE_STRING = 9,    // UTF-8 text.
     nullptr,                          //TYPE_GROUP = 10,    // Tag-delimited message.  Deprecated.
-    nullptr,                          //TYPE_MESSAGE = 11,  // Length-delimited message.
+    std::make_unique<MessageField>(), //TYPE_MESSAGE = 11,  // Length-delimited message.
     std::make_unique<BytesField>(),   //TYPE_BYTES = 12,     // Arbitrary byte array.
     std::make_unique<u32Field>(),     //TYPE_UINT32 = 13,    // uint32, varint on the wire
     nullptr,                          //TYPE_ENUM = 14,      // Enum, varint on the wire
