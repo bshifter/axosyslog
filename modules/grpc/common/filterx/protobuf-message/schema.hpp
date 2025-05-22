@@ -78,49 +78,59 @@ namespace common {
 //         std::vector<DynField> nestedFields_;
 //     };
 
-class ProtoErrorCollector : public google::protobuf::io::ErrorCollector {
-    public:
-        void AddError(int line, int column, const std::string& message) override {
-            errors_.emplace_back("Error at line " + std::to_string(line) +
-                                 ", col " + std::to_string(column) +
-                                 ": " + message);
-        }
+class ProtoErrorCollector : public google::protobuf::io::ErrorCollector
+{
+public:
+  void AddError(int line, int column, const std::string &message) override
+  {
+    errors_.emplace_back("Error at line " + std::to_string(line) +
+                         ", col " + std::to_string(column) +
+                         ": " + message);
+  }
 
-        void AddWarning(int line, int column, const std::string& message) override {
-            warnings_.emplace_back("Warning at line " + std::to_string(line) +
-                                   ", col " + std::to_string(column) +
-                                   ": " + message);
-        }
+  void AddWarning(int line, int column, const std::string &message) override
+  {
+    warnings_.emplace_back("Warning at line " + std::to_string(line) +
+                           ", col " + std::to_string(column) +
+                           ": " + message);
+  }
 
-        const std::vector<std::string>& errors() const { return errors_; }
-        const std::vector<std::string>& warnings() const { return warnings_; }
+  const std::vector<std::string> &errors() const
+  {
+    return errors_;
+  }
+  const std::vector<std::string> &warnings() const
+  {
+    return warnings_;
+  }
 
-    private:
-        std::vector<std::string> errors_;
-        std::vector<std::string> warnings_;
+private:
+  std::vector<std::string> errors_;
+  std::vector<std::string> warnings_;
 };
 
-class Schema {
+class Schema
+{
 public:
-    Schema(const std::string& packageName, const std::string& messageName);
-    Schema(const google::protobuf::FileDescriptorProto& proto, google::protobuf::DescriptorProto* msg);
-    Schema(const std::string& protoText, google::protobuf::io::ErrorCollector* errorCollector = nullptr);
-    void addField(const google::protobuf::FieldDescriptorProto& field);
-    void addDescriptor(const google::protobuf::DescriptorProto& desc);
-    std::string getProtoAsString() const;
-    const google::protobuf::FileDescriptorProto& getFileProto() const;
-    google::protobuf::DescriptorProto& getMessageProto() const;
-    void finalize();
-    std::unique_ptr<google::protobuf::Message> createMessageInstance() const;
-    bool loadFromProtoString(const std::string& protoText);
+  Schema(const std::string &packageName, const std::string &messageName);
+  Schema(const google::protobuf::FileDescriptorProto &proto, google::protobuf::DescriptorProto *msg);
+  Schema(const std::string &protoText, google::protobuf::io::ErrorCollector *errorCollector = nullptr);
+  void addField(const google::protobuf::FieldDescriptorProto &field);
+  void addDescriptor(const google::protobuf::DescriptorProto &desc);
+  std::string getProtoAsString() const;
+  const google::protobuf::FileDescriptorProto &getFileProto() const;
+  google::protobuf::DescriptorProto &getMessageProto() const;
+  void finalize();
+  std::unique_ptr<google::protobuf::Message> createMessageInstance() const;
+  bool loadFromProtoString(const std::string &protoText);
 private:
-    google::protobuf::FileDescriptorProto fileProto_;
-    google::protobuf::DescriptorProto* messageProto_;
+  google::protobuf::FileDescriptorProto fileProto_;
+  google::protobuf::DescriptorProto *messageProto_;
 
-    std::unique_ptr<google::protobuf::DescriptorPool> descriptorPool_;
-    std::unique_ptr<google::protobuf::DynamicMessageFactory> messageFactory_;
-    const google::protobuf::Descriptor* messageDescriptor_ = nullptr;
-    const google::protobuf::Message* messagePrototype_ = nullptr;
+  std::unique_ptr<google::protobuf::DescriptorPool> descriptorPool_;
+  std::unique_ptr<google::protobuf::DynamicMessageFactory> messageFactory_;
+  const google::protobuf::Descriptor *messageDescriptor_ = nullptr;
+  const google::protobuf::Message *messagePrototype_ = nullptr;
 };
 
 }
