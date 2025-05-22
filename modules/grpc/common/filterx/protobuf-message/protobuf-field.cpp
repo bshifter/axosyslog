@@ -46,25 +46,6 @@ using namespace syslogng::grpc::common;
 using namespace google::protobuf;
 using namespace google::protobuf::compiler;
 
-// #define FILTERX_OBJECT_ADDER                                                          \
-//   bool FilterXObjectAdder(Message *message,                         \
-//                  ProtoReflectors reflectors,                                          \
-//                  FilterXObject *object,                                               \
-//                  FilterXObject **assoc_object)                                        \
-//   {                                                                                   \
-//     try                                                                               \
-//     {                                                                                 \
-//       gpointer user_data[] = {&reflectors, message};                                  \
-//       return filterx_dict_iter(object, iter, user_data);                              \
-//     }                                                                                 \
-//     catch (const std::exception &e)                                                   \
-//     {                                                                                 \
-//       log_type_error(reflectors, object->type->name);                                 \
-//       return false;                                                                   \
-//     }                                                                                 \
-//     return true;                                                                      \
-//   }
-
 #define FILTERX_OBJECT_ADDER \
   bool FilterXObjectAdder(Message *message,  \
                           ProtoReflectors reflectors,  \
@@ -643,6 +624,32 @@ public:
 
 class MessageField : public ProtobufField
 {
+private:
+  static gboolean field_iterator(FilterXObject *key, FilterXObject *value, gpointer user_data)
+  {
+    try
+      {
+        auto *message = static_cast<Message*>(((gpointer *)user_data)[0]);
+
+        std::string field_name = extract_string_from_object(key);
+        ProtoReflectors sub_reflectors(*message, field_name);
+
+        ProtobufField *pbf = protobuf_converter_by_type((sub_reflectors).fieldType);
+
+        FilterXObject *assoc_object = NULL;
+        if (!pbf->Set(message, field_name, value, &assoc_object))
+            return FALSE;
+      }
+    catch (const std::exception &e)
+      {
+        msg_error("field iteration error",
+                  evt_tag_str("error", e.what()));
+        return FALSE;
+      }
+
+    return TRUE;
+  }
+
 public:
   FilterXObject *FilterXObjectGetter(Message *message, ProtoReflectors reflectors)
   {
@@ -652,17 +659,15 @@ public:
   bool FilterXObjectSetter(Message *message, ProtoReflectors reflectors, FilterXObject *object,
                            FilterXObject **assoc_object)
   {
-    std::unique_ptr<ProtobufField> inner;
-    if (reflectors.fieldDescriptor->is_map())
-      {
-        inner = std::make_unique<MapField>();
-      }
+    Message* sub_msg = reflectors.reflection->MutableMessage(message, reflectors.fieldDescriptor);
 
-    if (!inner)
-      {
-        throw std::logic_error("ProtobufField: unknown TYPE_MESSAGE handler");
-      }
-    return inner->FilterXObjectSetter(message, reflectors, object, assoc_object);
+    gpointer user_data[] = {sub_msg};
+
+    FilterXObject *dict = filterx_ref_unwrap_ro(object);
+    if (!dict || !filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict)))
+        throw std::runtime_error("ProtoField: Add: not a list object");
+
+    return filterx_dict_iter(dict, field_iterator, user_data);
   }
   bool FilterXObjectAdder(Message *message, ProtoReflectors reflectors, FilterXObject *object,
                           FilterXObject **assoc_object)
