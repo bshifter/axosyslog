@@ -48,9 +48,11 @@ namespace filterx {
 class DynamicProtoLoader
 {
 public:
-  DynamicProtoLoader(FilterXProtobufMessage *super_, const std::string& proto_content, const std::string& proto_filename = "dynamic.proto");
-  DynamicProtoLoader(FilterXProtobufMessage *super_, const std::string& message_name, const std::map<std::string, std::string>& schema_map);
-  Schema& getSchema();
+  DynamicProtoLoader(FilterXProtobufMessage *super_, const std::string &proto_content,
+                     const std::string &proto_filename = "dynamic.proto");
+  DynamicProtoLoader(FilterXProtobufMessage *super_, const std::string &message_name,
+                     const std::map<std::string, std::string> &schema_map);
+  Schema &getSchema();
 private:
   FilterXProtobufMessage *super;
   Schema _schema;

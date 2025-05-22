@@ -51,62 +51,67 @@ using namespace syslogng::grpc::common;
 using namespace google::protobuf;
 using namespace google::protobuf::compiler;
 
-Schema::Schema(const std::string& packageName, const std::string& messageName)
+Schema::Schema(const std::string &packageName, const std::string &messageName)
 {
-    fileProto_.set_name("generated.proto");
-    fileProto_.set_package(packageName);
+  fileProto_.set_name("generated.proto");
+  fileProto_.set_package(packageName);
 
-    DescriptorProto* msg = fileProto_.add_message_type();
-    msg->set_name(messageName);
-    messageProto_ = msg;
+  DescriptorProto *msg = fileProto_.add_message_type();
+  msg->set_name(messageName);
+  messageProto_ = msg;
 }
 
-Schema::Schema(const google::protobuf::FileDescriptorProto& proto,
-  google::protobuf::DescriptorProto* msg)
-: fileProto_(proto), messageProto_(nullptr)
+Schema::Schema(const google::protobuf::FileDescriptorProto &proto,
+               google::protobuf::DescriptorProto *msg)
+  : fileProto_(proto), messageProto_(nullptr)
 {
   // Find the corresponding message by name in the copied fileProto_
-  for (int i = 0; i < fileProto_.message_type_size(); ++i) {
-    if (fileProto_.message_type(i).name() == msg->name()) {
-      messageProto_ = fileProto_.mutable_message_type(i);
-      break;
+  for (int i = 0; i < fileProto_.message_type_size(); ++i)
+    {
+      if (fileProto_.message_type(i).name() == msg->name())
+        {
+          messageProto_ = fileProto_.mutable_message_type(i);
+          break;
+        }
     }
-  }
 
-  if (!messageProto_) {
-    throw std::runtime_error("Message not found in copied descriptor");
-  }
+  if (!messageProto_)
+    {
+      throw std::runtime_error("Message not found in copied descriptor");
+    }
 }
 
-Schema::Schema(const std::string& protoText, google::protobuf::io::ErrorCollector* errorCollector)
+Schema::Schema(const std::string &protoText, google::protobuf::io::ErrorCollector *errorCollector)
 {
-    using namespace google::protobuf;
+  using namespace google::protobuf;
 
-    io::ArrayInputStream input(protoText.data(), protoText.size());
-    io::Tokenizer tokenizer(&input, errorCollector);
-    compiler::Parser parser;
+  io::ArrayInputStream input(protoText.data(), protoText.size());
+  io::Tokenizer tokenizer(&input, errorCollector);
+  compiler::Parser parser;
 
-    fileProto_.set_name("generated.proto");
-    if (!parser.Parse(&tokenizer, &fileProto_)) {
-        throw std::runtime_error("Failed to parse proto file content");
+  fileProto_.set_name("generated.proto");
+  if (!parser.Parse(&tokenizer, &fileProto_))
+    {
+      throw std::runtime_error("Failed to parse proto file content");
     }
 
-    if (fileProto_.message_type_size() == 0) {
-        throw std::runtime_error("Empty proto file content");
+  if (fileProto_.message_type_size() == 0)
+    {
+      throw std::runtime_error("Empty proto file content");
     }
 
-    DescriptorProto* messageProto = fileProto_.mutable_message_type(0);
-    messageProto_ = messageProto;
+  DescriptorProto *messageProto = fileProto_.mutable_message_type(0);
+  messageProto_ = messageProto;
 }
 
 void
-Schema::addField(const FieldDescriptorProto& field)
+Schema::addField(const FieldDescriptorProto &field)
 {
-    *(messageProto_->add_field()) = field;
+  *(messageProto_->add_field()) = field;
 }
 
 void
-Schema::addDescriptor(const google::protobuf::DescriptorProto& desc)
+Schema::addDescriptor(const google::protobuf::DescriptorProto &desc)
 {
   *(messageProto_->add_nested_type()) = desc;
 }
@@ -114,19 +119,19 @@ Schema::addDescriptor(const google::protobuf::DescriptorProto& desc)
 std::string
 Schema::getProtoAsString() const
 {
-    return fileProto_.DebugString();
+  return fileProto_.DebugString();
 }
 
-const FileDescriptorProto&
+const FileDescriptorProto &
 Schema::getFileProto() const
 {
-    return fileProto_;
+  return fileProto_;
 }
 
-DescriptorProto&
+DescriptorProto &
 Schema::getMessageProto() const
 {
-    return *messageProto_;
+  return *messageProto_;
 }
 
 void
@@ -137,27 +142,31 @@ Schema::finalize()
   descriptorPool_ = std::make_unique<google::protobuf::DescriptorPool>();
   messageFactory_ = std::make_unique<google::protobuf::DynamicMessageFactory>();
 
-  const auto* fileDescriptor = descriptorPool_->BuildFile(fileProto_);
-  if (!fileDescriptor) {
+  const auto *fileDescriptor = descriptorPool_->BuildFile(fileProto_);
+  if (!fileDescriptor)
+    {
       throw std::runtime_error("Failed to build FileDescriptor in finalize().");
-  }
+    }
 
   messageDescriptor_ = fileDescriptor->FindMessageTypeByName(messageProto_->name());
-  if (!messageDescriptor_) {
+  if (!messageDescriptor_)
+    {
       throw std::runtime_error("Message type not found in FileDescriptor in finalize().");
-  }
+    }
 
   messagePrototype_ = messageFactory_->GetPrototype(messageDescriptor_);
-  if (!messagePrototype_) {
+  if (!messagePrototype_)
+    {
       throw std::runtime_error("Failed to get message prototype in finalize().");
-  }
+    }
 }
 
 std::unique_ptr<google::protobuf::Message>
 Schema::createMessageInstance() const
 {
-  if (!messagePrototype_) {
+  if (!messagePrototype_)
+    {
       throw std::runtime_error("Schema::finalize() must be called before createMessageInstance().");
-  }
+    }
   return std::unique_ptr<google::protobuf::Message>(messagePrototype_->New());
 }

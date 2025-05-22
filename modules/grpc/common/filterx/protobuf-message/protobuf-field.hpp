@@ -85,6 +85,9 @@ struct ProtoReflectors
 
 class ProtobufField
 {
+private:
+  bool add(google::protobuf::Message *message, const std::string &fieldName, FilterXObject *object,
+           FilterXObject **assoc_object);
 public:
   FilterXObject *Get(google::protobuf::Message *message, const std::string &fieldName)
   {
@@ -105,6 +108,9 @@ public:
     try
       {
         ProtoReflectors reflectors(*message, fieldName);
+        if (reflectors.fieldDescriptor->is_repeated())
+          return add(message, fieldName, object, assoc_object);
+
         if (this->FilterXObjectSetter(message, reflectors, object, assoc_object))
           {
             if (!(*assoc_object))
@@ -148,10 +154,11 @@ public:
   }
 
   virtual ~ProtobufField() {}
-// protected:
   virtual FilterXObject *FilterXObjectGetter(google::protobuf::Message *message, ProtoReflectors reflectors) = 0;
   virtual bool FilterXObjectSetter(google::protobuf::Message *message, ProtoReflectors reflectors,
                                    FilterXObject *object, FilterXObject **assoc_object) = 0;
+  virtual bool FilterXObjectAdder(google::protobuf::Message *message, ProtoReflectors reflectors, FilterXObject *object,
+                                  FilterXObject **assoc_object) = 0;
 };
 
 std::unique_ptr<ProtobufField> *all_protobuf_converters();
