@@ -59,23 +59,24 @@ using namespace google::protobuf::compiler;
 /* C++ Implementations */
 
 DynamicProtoLoader::DynamicProtoLoader(FilterXProtobufMessage *super_,
-  const std::string& message_name,
-  const std::map<std::string, std::string>& schema_map)
-: super(super_), _schema("example", message_name)
+                                       const std::string &message_name,
+                                       const std::map<std::string, std::string> &schema_map)
+  : super(super_), _schema("example", message_name)
 {
 // TODO: now use schema_map to add fields to schema
 }
 
 DynamicProtoLoader::DynamicProtoLoader(FilterXProtobufMessage *super_,
-  const std::string& proto_content,
-  const std::string& proto_filename)
-: super(super_), _schema(proto_content)
+                                       const std::string &proto_content,
+                                       const std::string &proto_filename)
+  : super(super_), _schema(proto_content)
 {
 // schema is now initialized
 }
 
-Schema&
-DynamicProtoLoader::getSchema() {
+Schema &
+DynamicProtoLoader::getSchema()
+{
   return _schema;
 }
 
@@ -91,23 +92,25 @@ FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE"={string literal}])"
 gboolean _dict_iterator(FilterXObject *key, FilterXObject *value, gpointer user_data)
 {
 
-  // TODO: check if key is real string
-  GString *v = scratch_buffers_alloc();
-  filterx_object_repr(value, v);
   try
-  {
-    auto* msg = static_cast<google::protobuf::Message*>(user_data);
-    std::string field_name = extract_string_from_object(key);
-    ProtoReflectors reflectors(*msg, field_name);
-    ProtobufField *pbf = protobuf_converter_by_type(reflectors.fieldType);
-
-    FilterXObject *assoc_object = NULL;
-    if (!pbf->Set(msg, field_name, value, &assoc_object))
     {
-      return FALSE;
+      auto *msg = static_cast<google::protobuf::Message *>(user_data);
+      std::string field_name = extract_string_from_object(key);
+      ProtoReflectors reflectors(*msg, field_name);
+      ProtobufField *pbf = protobuf_converter_by_type(reflectors.fieldType);
+
+      FilterXObject *assoc_object = NULL;
+      if (!pbf->Set(msg, field_name, value, &assoc_object))
+        {
+          return FALSE;
+        }
+
+      // DEBUG
+      GString *v = scratch_buffers_alloc();
+      filterx_object_repr(value, v);
+      std::cout << "DEBUG>> dict iterator: " << "key:" << field_name << "|val:" << std::string(v->str) << std::endl;
+      // EO DEBUG
     }
-    std::cout << "DEBUG>> dict iterator: " << "key:" << field_name << "|val:" << std::string(v->str) << std::endl;
-  }
   catch (const std::exception &e)
     {
       msg_error("dict iteration error",
@@ -125,9 +128,9 @@ _eval(FilterXExpr *s)
 
   FilterXObject *input = filterx_expr_eval(self->input);
   if (!input)
-  {
-    return NULL;
-  }
+    {
+      return NULL;
+    }
 
   FilterXObject *dict = filterx_ref_unwrap_ro(input);
   if (!filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict)))
@@ -258,23 +261,26 @@ _free(FilterXExpr *s)
   filterx_function_free_method(&self->super);
 }
 
-std::string _readFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::in | std::ios::binary);
+std::string _readFile(const std::string &filename)
+{
+  std::ifstream file(filename, std::ios::in | std::ios::binary);
 
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open file: " + filename);
+  if (!file.is_open())
+    {
+      throw std::runtime_error("Failed to open file: " + filename);
     }
 
-    std::ostringstream ss;
-    ss << file.rdbuf();
+  std::ostringstream ss;
+  ss << file.rdbuf();
 
-    if (file.fail() && !file.eof()) {
-        throw std::runtime_error("Error reading from file: " + filename);
+  if (file.fail() && !file.eof())
+    {
+      throw std::runtime_error("Error reading from file: " + filename);
     }
 
-    std::string content = ss.str();
+  std::string content = ss.str();
 
-    return content;
+  return content;
 }
 
 static gboolean
@@ -287,17 +293,19 @@ _extract_args(FilterXProtobufMessage *self, FilterXFunctionArgs *args, GError **
       return FALSE;
     }
 
-    self->input = filterx_function_args_get_expr(args, 0);
-    if (!self->input)
-      {
-        g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
-                    "input must be set. " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
-        return FALSE;
-      }
+  self->input = filterx_function_args_get_expr(args, 0);
+  if (!self->input)
+    {
+      g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
+                  "input must be set. " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
+      return FALSE;
+    }
 
-    gboolean exists = FALSE;
-    const gchar* proto_filename = filterx_function_args_get_named_literal_string(args, FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE, NULL, &exists);
-    if (exists && proto_filename != NULL) {
+  gboolean exists = FALSE;
+  const gchar *proto_filename = filterx_function_args_get_named_literal_string(args,
+                                FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE, NULL, &exists);
+  if (exists && proto_filename != NULL)
+    {
       std::string file_name(proto_filename);
       try
         {
@@ -309,29 +317,34 @@ _extract_args(FilterXProtobufMessage *self, FilterXFunctionArgs *args, GError **
           msg_error("protobuf-message: failed to load protobuf:", evt_tag_str("message", ex.what()));
           return FALSE;
         }
-    } else {
-        g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
-          "not yet implemented! " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
-        return FALSE;
+    }
+  else
+    {
+      g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
+                  "not yet implemented! " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
+      return FALSE;
 
       FilterXExpr *fx_schema = filterx_function_args_get_named_expr(args, FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA);
-      if (!fx_schema) {
-        g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
-          "one of '" FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE "' or '" FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA "' arguments must be set. " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
-        return FALSE;
-      }
-
-      if (!filterx_expr_is_literal_dict_generator(fx_schema)) {
-        g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
-          FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA " must be a dict literal. " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
+      if (!fx_schema)
+        {
+          g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
+                      "one of '" FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE "' or '" FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA
+                      "' arguments must be set. " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
           return FALSE;
-      }
+        }
+
+      if (!filterx_expr_is_literal_dict_generator(fx_schema))
+        {
+          g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
+                      FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA " must be a dict literal. " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE);
+          return FALSE;
+        }
 
       std::map<std::string, std::string> schema;
       self->cpp = new DynamicProtoLoader(self, "User", schema);
     }
 
-    return TRUE;
+  return TRUE;
 }
 
 FilterXExpr *
