@@ -48,36 +48,6 @@ namespace syslogng {
 namespace grpc {
 namespace common {
 
-// class DynField {
-//     public:
-//         DynField(
-//             std::string name,
-//             int number,
-//             google::protobuf::FieldDescriptorProto::Type type,
-//             google::protobuf::FieldDescriptorProto::Label label =
-//                 google::protobuf::FieldDescriptorProto::LABEL_OPTIONAL);
-
-//         // For nested message type
-//         void setNestedMessage(
-//             std::string nestedMessageName,
-//             std::vector<DynField> nestedFields);
-
-//         google::protobuf::FieldDescriptorProto toProto() const;
-
-//         static bool setField(google::protobuf::Message* msg, const std::string& fieldName, const std::variant<int32_t, std::string, std::vector<google::protobuf::Message*>>& value);
-//         static std::variant<int32_t, std::string, std::vector<google::protobuf::Message*>> getField(const google::protobuf::Message& msg, const std::string& fieldName);
-
-//     private:
-//         std::string name_;
-//         int number_;
-//         google::protobuf::FieldDescriptorProto::Type type_;
-//         google::protobuf::FieldDescriptorProto::Label label_;
-
-//         bool isNested_ = false;
-//         std::string nestedMessageName_;
-//         std::vector<DynField> nestedFields_;
-//     };
-
 class ProtoErrorCollector : public google::protobuf::io::ErrorCollector
 {
 public:
