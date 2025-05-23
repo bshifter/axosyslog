@@ -100,6 +100,32 @@ double_to_float_safe(double val)
   return (float)val;
 }
 
+static gboolean field_iterator(FilterXObject *key, FilterXObject *value, gpointer user_data)
+{
+  try
+    {
+      auto *message = static_cast<Message*>(((gpointer *)user_data)[0]);
+
+      std::string field_name = extract_string_from_object(key);
+      ProtoReflectors sub_reflectors(*message, field_name);
+
+      ProtobufField *pbf = protobuf_converter_by_type((sub_reflectors).fieldType);
+
+      FilterXObject *assoc_object = NULL;
+      if (!pbf->Set(message, field_name, value, &assoc_object))
+          return FALSE;
+    }
+  catch (const std::exception &e)
+    {
+      msg_error("field iteration error",
+                evt_tag_str("error", e.what()));
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+
 /* C++ Implementations */
 
 // ProtoReflectors reflectors
@@ -423,7 +449,6 @@ public:
   }
 };
 
-
 class DoubleField : public ProtobufField
 {
 private:
@@ -622,34 +647,40 @@ public:
   }
 };
 
-class MessageField : public ProtobufField
+class RepeatedNested : public ProtobufField
 {
 private:
-  static gboolean field_iterator(FilterXObject *key, FilterXObject *value, gpointer user_data)
+static gboolean iter(FilterXObject *key, FilterXObject *value, gpointer user_data)
+{
+  GET_USER_DATA;
+
+  Message* sub_msg = reflectors->reflection->AddMessage(message, reflectors->fieldDescriptor);
+
+  gpointer sub_user_data[] = {sub_msg};
+
+  FilterXObject *dict = filterx_ref_unwrap_ro(value);
+  if (!dict || !filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict)))
+      throw std::runtime_error("ProtoField: Add: not a list object");
+
+  return filterx_dict_iter(dict, field_iterator, sub_user_data);
+}
+public:
+  FilterXObject *FilterXObjectGetter(Message *message, ProtoReflectors reflectors)
   {
-    try
-      {
-        auto *message = static_cast<Message*>(((gpointer *)user_data)[0]);
-
-        std::string field_name = extract_string_from_object(key);
-        ProtoReflectors sub_reflectors(*message, field_name);
-
-        ProtobufField *pbf = protobuf_converter_by_type((sub_reflectors).fieldType);
-
-        FilterXObject *assoc_object = NULL;
-        if (!pbf->Set(message, field_name, value, &assoc_object))
-            return FALSE;
-      }
-    catch (const std::exception &e)
-      {
-        msg_error("field iteration error",
-                  evt_tag_str("error", e.what()));
-        return FALSE;
-      }
-
-    return TRUE;
+    throw std::logic_error("not yet implemented");
+    return NULL;
   }
+  bool FilterXObjectSetter(Message *message, ProtoReflectors reflectors, FilterXObject *object,
+                           FilterXObject **assoc_object)
+  {
+    return true;
+  }
+  FILTERX_OBJECT_ADDER
+};
 
+
+class MessageField : public ProtobufField
+{
 public:
   FilterXObject *FilterXObjectGetter(Message *message, ProtoReflectors reflectors)
   {
@@ -677,7 +708,10 @@ public:
       {
         inner = std::make_unique<MapField>();
       }
-
+      else if (reflectors.fieldDescriptor->is_repeated())
+      {
+        inner = std::make_unique<RepeatedNested>();
+      }
     if (!inner)
       {
         throw std::logic_error("ProtobufField: unknown TYPE_MESSAGE handler");
