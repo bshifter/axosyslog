@@ -30,7 +30,7 @@
 #include "filterx/object-dict-interface.h"
 #include "protobuf-message.h"
 #include "compat/cpp-end.h"
-#include "schema.hpp"
+#include "schema/schema.hpp"
 
 #include "google/protobuf/message.h"
 

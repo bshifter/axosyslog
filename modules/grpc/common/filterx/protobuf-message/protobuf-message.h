@@ -33,7 +33,12 @@
 FILTERX_FUNCTION_DECLARE(protobuf_message);
 FilterXExpr *filterx_protobuf_message_new_from_args(FilterXFunctionArgs *args, GError **error);
 
-// FILTERX_DECLARE_TYPE(protobuf_message);
+#define FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE "schema_file"
+#define FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA "schema"
+
+#define FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE "Usage: protobuf_message({dict}, [" \
+FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA"={dict}(not yet implemented)," \
+FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE"={string literal}])"
 
 static inline void
 protobuf_filterx_objects_global_init(void)

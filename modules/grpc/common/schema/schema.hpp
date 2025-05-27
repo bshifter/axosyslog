@@ -28,9 +28,7 @@
 
 #include "compat/cpp-start.h"
 #include "filterx/object-dict-interface.h"
-#include "protobuf-message.h"
 #include "compat/cpp-end.h"
-
 
 #include "google/protobuf/message.h"
 
