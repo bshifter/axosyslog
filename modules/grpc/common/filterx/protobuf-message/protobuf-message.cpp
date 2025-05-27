@@ -37,7 +37,6 @@
 #include "compat/cpp-end.h"
 
 #include <google/protobuf/util/json_util.h>
-#include "schema.hpp"
 #include "protobuf-field.hpp"
 #include "logmsg/logmsg.h"
 
@@ -83,13 +82,6 @@ DynamicProtoLoader::getSchema()
 
 // /* C Wrappers */
 
-#define FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE "schema_file"
-#define FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA "schema"
-
-#define FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE "Usage: protobuf_message({dict}, [" \
-FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA"={dict}(not yet implemented)," \
-FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE"={string literal}])"
-
 gboolean _dict_iterator(FilterXObject *key, FilterXObject *value, gpointer user_data)
 {
 
@@ -102,15 +94,9 @@ gboolean _dict_iterator(FilterXObject *key, FilterXObject *value, gpointer user_
 
       FilterXObject *assoc_object = NULL;
       if (!pbf->Set(msg, field_name, value, &assoc_object))
-        {
-          return FALSE;
-        }
-
-      // DEBUG
-      GString *v = scratch_buffers_alloc();
-      filterx_object_repr(value, v);
-      std::cout << "DEBUG>> dict iterator: " << "key:" << field_name << "|val:" << std::string(v->str) << std::endl;
-      // EO DEBUG
+        return FALSE;
+      filterx_object_unref(value);
+      value = assoc_object;
     }
   catch (const std::exception &e)
     {
@@ -146,12 +132,15 @@ _eval(FilterXExpr *s)
 
   gpointer user_data = static_cast<gpointer>(msg.get());
   gboolean iter_res = filterx_dict_iter(dict, _dict_iterator, user_data);
+  filterx_object_unref(input);
   if (!iter_res)
     return NULL;
 
   std::cout << "DEBUG>> message debugstring: " << msg->DebugString() << std::endl;
 
   std::string protobuf_string = msg->SerializeAsString();
+
+  // delete msg.get();
 
   return filterx_protobuf_new(protobuf_string.c_str(), protobuf_string.length());
 }
@@ -256,7 +245,8 @@ _extract_args(FilterXProtobufMessage *self, FilterXFunctionArgs *args, GError **
         }
       catch(const std::exception &ex)
         {
-          msg_error("protobuf-message: failed to load protobuf:", evt_tag_str("message", ex.what()));
+          g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
+                  "protobuf-message: failed to load protobuf:%s " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE, ex.what());
           return FALSE;
         }
     }
