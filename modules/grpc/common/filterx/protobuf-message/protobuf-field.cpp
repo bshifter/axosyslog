@@ -114,6 +114,8 @@ static gboolean field_iterator(FilterXObject *key, FilterXObject *value, gpointe
       FilterXObject *assoc_object = NULL;
       if (!pbf->Set(message, field_name, value, &assoc_object))
           return FALSE;
+      filterx_object_unref(value);
+      value = assoc_object;
     }
   catch (const std::exception &e)
     {
@@ -602,11 +604,15 @@ private:
           {
             return FALSE;
           };
+        filterx_object_unref(key);
+        key = assoc_key_object;
         FilterXObject *assoc_val_object = NULL;
         if (!pbf_val->Set(entry_message, val_name, value, &assoc_val_object))
           {
             return FALSE;
           };
+        filterx_object_unref(value);
+        value = assoc_val_object;
       }
     catch (const std::exception &e)
       {

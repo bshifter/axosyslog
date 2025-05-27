@@ -30,7 +30,7 @@
 #include "plugin.h"
 #include "scratch-buffers.h"
 
-#include "schema.hpp"
+#include "schema/schema.hpp"
 
 #include <time.h>
 #include <string.h>
