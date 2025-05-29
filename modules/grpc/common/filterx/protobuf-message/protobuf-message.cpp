@@ -191,9 +191,10 @@ std::string _readFile(const std::string &filename)
   std::ifstream file(filename, std::ios::in | std::ios::binary);
 
   char cwd[PATH_MAX];
-  if (getcwd(cwd, sizeof(cwd)) == NULL) {
-    throw std::runtime_error("Failed to resolve full path for file: " + filename);
-  }
+  if (getcwd(cwd, sizeof(cwd)) == NULL)
+    {
+      throw std::runtime_error("Failed to resolve full path for file: " + filename);
+    }
   std::string fullPath = std::string(cwd) + "/" + filename;
 
   if (!file.is_open())
@@ -246,7 +247,7 @@ _extract_args(FilterXProtobufMessage *self, FilterXFunctionArgs *args, GError **
       catch(const std::exception &ex)
         {
           g_set_error(error, FILTERX_FUNCTION_ERROR, FILTERX_FUNCTION_ERROR_CTOR_FAIL,
-                  "protobuf-message: failed to load protobuf:%s " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE, ex.what());
+                      "protobuf-message: failed to load protobuf:%s " FILTERX_FUNC_PROTOBUF_MESSAGE_USAGE, ex.what());
           return FALSE;
         }
     }
