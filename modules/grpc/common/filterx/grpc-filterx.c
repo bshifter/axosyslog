@@ -36,7 +36,6 @@ static Plugin grpc_plugins[] =
 gboolean
 grpc_common_plugins_module_init(PluginContext *context, CfgArgs *args)
 {
-  protobuf_filterx_objects_global_init();
   plugin_register(context, grpc_plugins, G_N_ELEMENTS(grpc_plugins));
   grpc_register_global_initializers();
   return TRUE;
