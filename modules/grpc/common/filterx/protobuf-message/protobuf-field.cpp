@@ -104,7 +104,7 @@ static gboolean field_iterator(FilterXObject *key, FilterXObject *value, gpointe
 {
   try
     {
-      auto *message = static_cast<Message*>(((gpointer *)user_data)[0]);
+      auto *message = static_cast<Message *>(((gpointer *)user_data)[0]);
 
       std::string field_name = extract_string_from_object(key);
       ProtoReflectors sub_reflectors(*message, field_name);
@@ -113,7 +113,7 @@ static gboolean field_iterator(FilterXObject *key, FilterXObject *value, gpointe
 
       FilterXObject *assoc_object = NULL;
       if (!pbf->Set(message, field_name, value, &assoc_object))
-          return FALSE;
+        return FALSE;
       filterx_object_unref(value);
       value = assoc_object;
     }
@@ -425,28 +425,29 @@ public:
 
     return true;
   }
-  bool FilterXObjectAdder(Message *message, ProtoReflectors reflectors, FilterXObject *object, FilterXObject **assoc_object)
+  bool FilterXObjectAdder(Message *message, ProtoReflectors reflectors, FilterXObject *object,
+                          FilterXObject **assoc_object)
   {
     try
-    {
-      gpointer user_data[] = {&reflectors, message};
-      guint64 len;
-      filterx_object_len(object, &len);
-      if (len == 0)
-        return TRUE;
-      for (gint64 i = 0; i < ((gint64) len); i++)
-        {
-          FilterXObject *elem = filterx_list_get_subscript(object, i);
-          FilterXObject *elem_unwrapped = filterx_ref_unwrap_ro(elem);
-          iter(NULL, elem_unwrapped, user_data);
-          filterx_object_unref(elem);
-        }
-    }
+      {
+        gpointer user_data[] = {&reflectors, message};
+        guint64 len;
+        filterx_object_len(object, &len);
+        if (len == 0)
+          return TRUE;
+        for (gint64 i = 0; i < ((gint64) len); i++)
+          {
+            FilterXObject *elem = filterx_list_get_subscript(object, i);
+            FilterXObject *elem_unwrapped = filterx_ref_unwrap_ro(elem);
+            iter(NULL, elem_unwrapped, user_data);
+            filterx_object_unref(elem);
+          }
+      }
     catch (const std::exception &e)
-    {
-      log_type_error(reflectors, object->type->name);
-      return false;
-    }
+      {
+        log_type_error(reflectors, object->type->name);
+        return false;
+      }
     return true;
   }
 };
@@ -656,20 +657,20 @@ public:
 class RepeatedNested : public ProtobufField
 {
 private:
-static gboolean iter(FilterXObject *key, FilterXObject *value, gpointer user_data)
-{
-  GET_USER_DATA;
+  static gboolean iter(FilterXObject *key, FilterXObject *value, gpointer user_data)
+  {
+    GET_USER_DATA;
 
-  Message* sub_msg = reflectors->reflection->AddMessage(message, reflectors->fieldDescriptor);
+    Message *sub_msg = reflectors->reflection->AddMessage(message, reflectors->fieldDescriptor);
 
-  gpointer sub_user_data[] = {sub_msg};
+    gpointer sub_user_data[] = {sub_msg};
 
-  FilterXObject *dict = filterx_ref_unwrap_ro(value);
-  if (!dict || !filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict)))
+    FilterXObject *dict = filterx_ref_unwrap_ro(value);
+    if (!dict || !filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict)))
       throw std::runtime_error("ProtoField: Add: not a list object");
 
-  return filterx_dict_iter(dict, field_iterator, sub_user_data);
-}
+    return filterx_dict_iter(dict, field_iterator, sub_user_data);
+  }
 public:
   FilterXObject *FilterXObjectGetter(Message *message, ProtoReflectors reflectors)
   {
@@ -696,13 +697,13 @@ public:
   bool FilterXObjectSetter(Message *message, ProtoReflectors reflectors, FilterXObject *object,
                            FilterXObject **assoc_object)
   {
-    Message* sub_msg = reflectors.reflection->MutableMessage(message, reflectors.fieldDescriptor);
+    Message *sub_msg = reflectors.reflection->MutableMessage(message, reflectors.fieldDescriptor);
 
     gpointer user_data[] = {sub_msg};
 
     FilterXObject *dict = filterx_ref_unwrap_ro(object);
     if (!dict || !filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict)))
-        throw std::runtime_error("ProtoField: Add: not a list object");
+      throw std::runtime_error("ProtoField: Add: not a list object");
 
     return filterx_dict_iter(dict, field_iterator, user_data);
   }
@@ -714,7 +715,7 @@ public:
       {
         inner = std::make_unique<MapField>();
       }
-      else if (reflectors.fieldDescriptor->is_repeated())
+    else if (reflectors.fieldDescriptor->is_repeated())
       {
         inner = std::make_unique<RepeatedNested>();
       }

@@ -44,14 +44,14 @@
 static void
 _helper_create_proto_file(const gchar *proto_content)
 {
-    FILE *f = fopen(TEST_PB_MSG_FILEPATH, "wb");
-    cr_assert_not_null(f);
+  FILE *f = fopen(TEST_PB_MSG_FILEPATH, "wb");
+  cr_assert_not_null(f);
 
-    size_t len = strlen(proto_content);
+  size_t len = strlen(proto_content);
 
-    size_t written = fwrite(proto_content, sizeof(gchar), len, f);
-    cr_assert_eq(written, len);
-    fclose(f);
+  size_t written = fwrite(proto_content, sizeof(gchar), len, f);
+  cr_assert_eq(written, len);
+  fclose(f);
 }
 
 static void
@@ -82,7 +82,7 @@ _assert_protobuf_message_init_success(GList *args)
 
 Test(filterx_protobuf_message, invalid_args)
 {
-    GList *args = NULL;
+  GList *args = NULL;
 
   /* no args */
   _assert_protobuf_message_init_fail(NULL);
@@ -97,15 +97,17 @@ Test(filterx_protobuf_message, invalid_args)
   _assert_protobuf_message_init_fail(args);
   args = NULL;
 
-    /* no schema not yet implemented */
+  /* no schema not yet implemented */
   args = g_list_append(args, filterx_function_arg_new(NULL, filterx_non_literal_new(filterx_test_dict_new())));
-  args = g_list_append(args, filterx_function_arg_new(FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA, filterx_literal_new(filterx_test_dict_new())));
+  args = g_list_append(args, filterx_function_arg_new(FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA,
+                                                      filterx_literal_new(filterx_test_dict_new())));
   _assert_protobuf_message_init_fail(args);
   args = NULL;
 
   /* wrong file name */
   args = g_list_append(args, filterx_function_arg_new(NULL, filterx_non_literal_new(filterx_test_dict_new())));
-  args = g_list_append(args, filterx_function_arg_new(FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE, filterx_literal_new(filterx_string_new("wrong.filename", -1))));
+  args = g_list_append(args, filterx_function_arg_new(FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE,
+                                                      filterx_literal_new(filterx_string_new("wrong.filename", -1))));
   _assert_protobuf_message_init_fail(args);
   args = NULL;
 
@@ -113,27 +115,28 @@ Test(filterx_protobuf_message, invalid_args)
 
 Test(filterx_protobuf_message, load_proto_from_file)
 {
-    const gchar* test_proto =
+  const gchar *test_proto =
     "syntax = \"proto3\";"
     "package test.pkg;"
     "message TestProto4 {"
     "string name = 1;"
     "}";
 
-    _helper_create_proto_file(test_proto);
+  _helper_create_proto_file(test_proto);
 
-    GList *args = NULL;
-    args = g_list_append(args, filterx_function_arg_new(NULL, filterx_non_literal_new(filterx_test_dict_new())));
-    args = g_list_append(args, filterx_function_arg_new(FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE, filterx_literal_new(filterx_string_new(TEST_PB_MSG_FILEPATH, -1))));
+  GList *args = NULL;
+  args = g_list_append(args, filterx_function_arg_new(NULL, filterx_non_literal_new(filterx_test_dict_new())));
+  args = g_list_append(args, filterx_function_arg_new(FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE,
+                                                      filterx_literal_new(filterx_string_new(TEST_PB_MSG_FILEPATH, -1))));
 
-    FilterXExpr *func = _assert_protobuf_message_init_success(args);
+  FilterXExpr *func = _assert_protobuf_message_init_success(args);
 
-    filterx_expr_unref(func);
+  filterx_expr_unref(func);
 }
 
 Test(filterx_protobuf_message, assign_vars)
 {
-    const gchar* test_proto =
+  const gchar *test_proto =
     "syntax = \"proto3\";"
     "package test.pkg;"
     "message TestProto7 {"
@@ -150,39 +153,40 @@ Test(filterx_protobuf_message, assign_vars)
     "  }"
     "}";
 
-    _helper_create_proto_file(test_proto);
+  _helper_create_proto_file(test_proto);
 
-    GError *json_err = NULL;
-    FilterXObject *dict = filterx_object_from_json(
-    "{\"name\": \"test message\","
-			"\"id\": 333,"
-			"\"foobar\": {"
-				"\"host\": \"test host\","
-				"\"time\": \"test time string\","
-				"\"date\": \"test date string\""
-				"},"
-			"\"arr\": [\"foo\", \"bar\", \"baz\", {\"map\": {\"more\": \"nested\"}}],"
-			"\"sub\": {\"foo\":\"FOO\", \"bar\":\"BAR\", \"baz\":\"BAZ\"},"
-			"\"repsub\": [{\"foo\": \"foo1\", \"bar\": \"bar1\", \"baz\": \"baz1\"},"
-						"{\"foo\": \"TIK\", \"bar\": \"TAK\", \"baz\": \"TOE\"}]"
-			"};"
-        , -1, &json_err);
-    cr_assert_null(json_err);
+  GError *json_err = NULL;
+  FilterXObject *dict = filterx_object_from_json(
+                          "{\"name\": \"test message\","
+                          "\"id\": 333,"
+                          "\"foobar\": {"
+                          "\"host\": \"test host\","
+                          "\"time\": \"test time string\","
+                          "\"date\": \"test date string\""
+                          "},"
+                          "\"arr\": [\"foo\", \"bar\", \"baz\", {\"map\": {\"more\": \"nested\"}}],"
+                          "\"sub\": {\"foo\":\"FOO\", \"bar\":\"BAR\", \"baz\":\"BAZ\"},"
+                          "\"repsub\": [{\"foo\": \"foo1\", \"bar\": \"bar1\", \"baz\": \"baz1\"},"
+                          "{\"foo\": \"TIK\", \"bar\": \"TAK\", \"baz\": \"TOE\"}]"
+                          "};"
+                          , -1, &json_err);
+  cr_assert_null(json_err);
 
-    FilterXExpr *expr = filterx_non_literal_new(dict);
+  FilterXExpr *expr = filterx_non_literal_new(dict);
 
-    GList *args = NULL;
-    args = g_list_append(args, filterx_function_arg_new(NULL, expr));
-    args = g_list_append(args, filterx_function_arg_new(FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE, filterx_literal_new(filterx_string_new(TEST_PB_MSG_FILEPATH, -1))));
+  GList *args = NULL;
+  args = g_list_append(args, filterx_function_arg_new(NULL, expr));
+  args = g_list_append(args, filterx_function_arg_new(FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE,
+                                                      filterx_literal_new(filterx_string_new(TEST_PB_MSG_FILEPATH, -1))));
 
-    FilterXExpr *func = _assert_protobuf_message_init_success(args);
+  FilterXExpr *func = _assert_protobuf_message_init_success(args);
 
-    FilterXObject *result = filterx_expr_eval(func);
+  FilterXObject *result = filterx_expr_eval(func);
 
-    cr_assert(filterx_object_is_type(result, &FILTERX_TYPE_NAME(protobuf)));
+  cr_assert(filterx_object_is_type(result, &FILTERX_TYPE_NAME(protobuf)));
 
-    filterx_object_unref(result);
-    filterx_expr_unref(func);
+  filterx_object_unref(result);
+  filterx_expr_unref(func);
 }
 
 static void

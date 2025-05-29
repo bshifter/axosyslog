@@ -40,18 +40,6 @@ FilterXExpr *filterx_protobuf_message_new_from_args(FilterXFunctionArgs *args, G
 FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA"={dict}(not yet implemented)," \
 FILTERX_FUNC_PROTOBUF_MESSAGE_ARG_NAME_SCHEMA_FILE"={string literal}])"
 
-static inline void
-protobuf_filterx_objects_global_init(void)
-{
-  static gboolean initialized = FALSE;
-
-  if (!initialized)
-    {
-      // TODO init here
-      initialized = TRUE;
-    }
-}
-
 #include "compat/cpp-end.h"
 
 #endif

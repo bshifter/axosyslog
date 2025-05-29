@@ -1,6 +1,7 @@
 include modules/grpc/common/credentials/Makefile.am
 include modules/grpc/common/metrics/Makefile.am
 include modules/grpc/common/schema/Makefile.am
+include modules/grpc/common/filterx/Makefile.am
 
 if ENABLE_GRPC
 
