@@ -703,7 +703,7 @@ public:
 
     FilterXObject *dict = filterx_ref_unwrap_ro(object);
     if (!dict || !filterx_object_is_type(dict, &FILTERX_TYPE_NAME(dict)))
-      throw std::runtime_error("ProtoField: Add: not a list object");
+      throw std::runtime_error("ProtoField: Add: not a dict object");
 
     return filterx_dict_iter(dict, field_iterator, user_data);
   }
