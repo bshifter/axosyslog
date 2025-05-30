@@ -34,7 +34,7 @@ static Plugin grpc_plugins[] =
 };
 
 gboolean
-grpc_common_plugins_module_init(PluginContext *context, CfgArgs *args)
+grpc_filterx_module_init(PluginContext *context, CfgArgs *args)
 {
   plugin_register(context, grpc_plugins, G_N_ELEMENTS(grpc_plugins));
   grpc_register_global_initializers();
@@ -43,7 +43,7 @@ grpc_common_plugins_module_init(PluginContext *context, CfgArgs *args)
 
 const ModuleInfo module_info =
 {
-  .canonical_name = "grpc-common-plugins",
+  .canonical_name = "grpc-filterx",
   .version = SYSLOG_NG_VERSION,
   .description = "GRPC Common Plugins",
   .core_revision = SYSLOG_NG_SOURCE_REVISION,
