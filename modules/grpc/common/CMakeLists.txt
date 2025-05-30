@@ -27,3 +27,5 @@ add_module(
   INCLUDES ${PROJECT_SOURCE_DIR}/modules/grpc/common
   LIBRARY_TYPE STATIC
 )
+
+target_link_libraries(grpc-common-cpp PRIVATE schema-cpp)
