@@ -35,6 +35,7 @@
 #include "compat/cpp-end.h"
 
 #include <google/protobuf/util/json_util.h>
+// #include <google/protobuf/timestamp.pb.h>
 
 #include <unistd.h>
 #include <cstdio>
@@ -133,21 +134,51 @@ Schema::getMessageProto() const
   return *messageProto_;
 }
 
+
 void
 Schema::finalize()
 {
-  if (messagePrototype_) return;  // Already finalized
+  if (messagePrototype_) return; // Already finalized
 
   descriptorPool_ = std::make_unique<google::protobuf::DescriptorPool>();
   messageFactory_ = std::make_unique<google::protobuf::DynamicMessageFactory>();
 
-  const auto *fileDescriptor = descriptorPool_->BuildFile(fileProto_);
-  if (!fileDescriptor)
+  google::protobuf::compiler::DiskSourceTree sourceTree;
+  sourceTree.MapPath("", "/usr/include"); // Add more paths as needed
+
+  google::protobuf::compiler::Importer importer(&sourceTree, nullptr);
+
+  // Step 2: Import all dependencies dynamically
+  for (int i = 0; i < fileProto_.dependency_size(); ++i)
+  {
+    const std::string& dependency = fileProto_.dependency(i);
+    const google::protobuf::FileDescriptor* depFd = importer.Import(dependency);
+    if (!depFd)
     {
-      throw std::runtime_error("Failed to build FileDescriptor in finalize().");
+      throw std::runtime_error("Failed to import dependency: " + dependency);
     }
 
-  messageDescriptor_ = fileDescriptor->FindMessageTypeByName(messageProto_->name());
+    google::protobuf::FileDescriptorProto depProto;
+    depFd->CopyTo(&depProto);
+    if (!descriptorPool_->BuildFile(depProto))
+    {
+      throw std::runtime_error("Failed to build dependency in pool: " + dependency);
+    }
+  }
+
+  const auto* fileDescriptor = descriptorPool_->BuildFile(fileProto_);
+  if (!fileDescriptor)
+  {
+    throw std::runtime_error("Failed to build main FileDescriptor");
+  }
+
+  std::string fullName;
+  if (!fileProto_.package().empty())
+      fullName = fileProto_.package() + "." + messageProto_->name();
+  else
+      fullName = messageProto_->name();
+
+  messageDescriptor_ = descriptorPool_->FindMessageTypeByName(fullName);
   if (!messageDescriptor_)
     {
       throw std::runtime_error("Message type not found in FileDescriptor in finalize().");
@@ -159,6 +190,57 @@ Schema::finalize()
       throw std::runtime_error("Failed to get message prototype in finalize().");
     }
 }
+
+// void
+// Schema::finalize()
+// {
+//   if (messagePrototype_) return;  // Already finalized
+
+//   ////
+//   auto source_tree = std::make_unique<google::protobuf::compiler::DiskSourceTree>();
+//   source_tree->MapPath("", "/usr/include"); // Make sure timestamp.proto is in here
+
+//   // // Set up the importer
+//   google::protobuf::compiler::Importer importer(source_tree.get(), nullptr);
+//   const google::protobuf::FileDescriptor* timestamp_fd =
+//       importer.Import("google/protobuf/timestamp.proto");
+
+//   if (!timestamp_fd) {
+//     throw std::runtime_error("Failed to import timestamp.proto");
+//   }
+
+//   // Now create your own DescriptorPool and build your proto file
+//   descriptorPool_ = std::make_unique<google::protobuf::DescriptorPool>(importer.pool());
+//   messageFactory_ = std::make_unique<google::protobuf::DynamicMessageFactory>();
+
+//   const auto* fileDescriptor = descriptorPool_->BuildFile(fileProto_);
+//   ////
+//   // descriptorPool_ = std::make_unique<google::protobuf::DescriptorPool>();
+//   // messageFactory_ = std::make_unique<google::protobuf::DynamicMessageFactory>();
+
+//   // const auto *fileDescriptor = descriptorPool_->BuildFile(fileProto_);
+//   ////
+//   if (!fileDescriptor)
+//     {
+//       throw std::runtime_error("Failed to build FileDescriptor in finalize().");
+//     }
+
+//   messageDescriptor_ = fileDescriptor->FindMessageTypeByName(messageProto_->name());
+//   if (!messageDescriptor_)
+//     {
+//       throw std::runtime_error("Message type not found in FileDescriptor in finalize().");
+//     }
+
+//   messagePrototype_ = messageFactory_->GetPrototype(messageDescriptor_);
+//   if (!messagePrototype_)
+//     {
+//       throw std::runtime_error("Failed to get message prototype in finalize().");
+//     }
+
+//   const google::protobuf::Descriptor* desc = descriptorPool_->FindMessageTypeByName("google.protobuf.Timestamp");
+//   if (!desc) throw std::runtime_error("timestamp.proto not found");
+
+// }
 
 std::unique_ptr<google::protobuf::Message>
 Schema::createMessageInstance() const
