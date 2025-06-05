@@ -280,6 +280,10 @@ private:
     if (filterx_object_extract_integer(object, &i))
       return MAX(0, MIN(UINT32_MAX, i));
 
+    UnixTime utime;
+    if (filterx_object_extract_datetime(object, &utime))
+      return unix_time_to_unix_epoch_usec(utime) / 1000000;
+
     throw std::runtime_error("ProtoField extract: unsupported type");
   }
   static gboolean iter(FilterXObject *key, FilterXObject *value, gpointer user_data)
