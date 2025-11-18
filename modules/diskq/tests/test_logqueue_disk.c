@@ -158,9 +158,9 @@ _assert_log_queue_disk_non_reliable_is_empty(LogQueue *q)
 {
   LogQueueDiskNonReliable *queue = (LogQueueDiskNonReliable *) q;
 
-  cr_assert_eq(g_queue_get_length(queue->front_cache), 0);
-  cr_assert_eq(g_queue_get_length(queue->flow_control_window), 0);
-  cr_assert_eq(g_queue_get_length(queue->backlog), 0);
+  cr_assert_eq(queue->front_cache.len, 0);
+  cr_assert_eq(queue->flow_control_window.len, 0);
+  cr_assert_eq(queue->backlog.len, 0);
   cr_assert_eq(qdisk_get_length(queue->super.qdisk), 0);
 
   cr_assert(q->metrics.shared.memory_usage);
@@ -252,9 +252,9 @@ _assert_log_queue_disk_non_reliable_has_messages_in_front_cache(LogQueue *q, gui
   const gssize log_msg_size = log_msg_get_size(msg);
   log_msg_unref(msg);
 
-  cr_assert_eq(g_queue_get_length(queue->front_cache), num_of_messages * item_number_per_message);
-  cr_assert_eq(g_queue_get_length(queue->flow_control_window), 0);
-  cr_assert_eq(g_queue_get_length(queue->backlog), 0);
+  cr_assert_eq(queue->front_cache.len, num_of_messages * item_number_per_message);
+  cr_assert_eq(queue->flow_control_window.len, 0);
+  cr_assert_eq(queue->backlog.len, 0);
   cr_assert_eq(qdisk_get_length(queue->super.qdisk), 0);
 
   cr_assert(q->metrics.shared.memory_usage);
