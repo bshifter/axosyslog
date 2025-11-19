@@ -89,8 +89,8 @@ _work(gpointer s, gpointer arg)
           LogMessage *msg = log_msg_ref(node->msg);
 
           LogPathOptions path_options = LOG_PATH_OPTIONS_INIT;
-          path_options.ack_needed = node->ack_needed;
-          path_options.flow_control_requested = node->flow_control_requested;
+          path_options.ack_needed = node->bf.ack_needed;
+          path_options.flow_control_requested = node->bf.flow_control_requested;
 
           log_msg_free_queue_node(node);
 

@@ -452,11 +452,10 @@ static void
 log_msg_init_queue_node(LogMessage *msg, LogMessageQueueNode *node, const LogPathOptions *path_options)
 {
   INIT_IV_LIST_HEAD(&node->list);
-  node->__bitfield = 0;
   if (path_options)
     {
-      node->ack_needed = path_options->ack_needed;
-      node->flow_control_requested = path_options->flow_control_requested;
+      node->bf.ack_needed = path_options->ack_needed;
+      node->bf.flow_control_requested = path_options->flow_control_requested;
     }
   node->msg = log_msg_ref(msg);
 }
@@ -477,7 +476,7 @@ log_msg_alloc_queue_node(LogMessage *msg, const LogPathOptions *path_options)
   if (msg->cur_node < msg->num_nodes)
     {
       node = &msg->nodes[msg->cur_node++];
-      node->embedded = TRUE;
+      node->bf.embedded = TRUE;
     }
   else
     {
@@ -494,7 +493,7 @@ log_msg_alloc_queue_node(LogMessage *msg, const LogPathOptions *path_options)
       if (nodes < 32 && nodes <= msg->num_nodes)
         logmsg_queue_node_max = msg->num_nodes + 1;
       node = g_slice_new(LogMessageQueueNode);
-      node->embedded = FALSE;
+      node->bf.embedded = FALSE;
     }
   log_msg_init_queue_node(msg, node, path_options);
   return node;
@@ -503,7 +502,7 @@ log_msg_alloc_queue_node(LogMessage *msg, const LogPathOptions *path_options)
 void
 log_msg_free_queue_node(LogMessageQueueNode *node)
 {
-  if (!node->embedded)
+  if (!node->bf.embedded)
     g_slice_free(LogMessageQueueNode, node);
 }
 

@@ -186,8 +186,8 @@ log_queue_fifo_drop_messages_from_input_queue(LogQueueFifo *self, InputQueue *in
 
       item = item->next;
 
-      path_options.ack_needed = node->ack_needed;
-      path_options.flow_control_requested = node->flow_control_requested;
+      path_options.ack_needed = node->bf.ack_needed;
+      path_options.flow_control_requested = node->bf.flow_control_requested;
 
       if (path_options.flow_control_requested)
         continue;
@@ -454,10 +454,10 @@ log_queue_fifo_pop_head(LogQueue *s, LogPathOptions *path_options)
       node = iv_list_entry(self->output_queue.items.next, LogMessageQueueNode, list);
 
       msg = node->msg;
-      path_options->ack_needed = node->ack_needed;
+      path_options->ack_needed = node->bf.ack_needed;
       self->output_queue.len--;
 
-      if (!node->flow_control_requested)
+      if (!node->bf.flow_control_requested)
         self->output_queue.non_flow_controlled_len--;
 
       iv_list_del_init(&node->list);
@@ -482,7 +482,7 @@ log_queue_fifo_pop_head(LogQueue *s, LogPathOptions *path_options)
   iv_list_add_tail(&node->list, &self->backlog_queue.items);
   self->backlog_queue.len++;
 
-  if (!node->flow_control_requested)
+  if (!node->bf.flow_control_requested)
     self->backlog_queue.non_flow_controlled_len++;
 
   return msg;
@@ -508,10 +508,10 @@ log_queue_fifo_ack_backlog(LogQueue *s, gint rewind_count)
       iv_list_del(&node->list);
       self->backlog_queue.len--;
 
-      if (!node->flow_control_requested)
+      if (!node->bf.flow_control_requested)
         self->backlog_queue.non_flow_controlled_len--;
 
-      path_options.ack_needed = node->ack_needed;
+      path_options.ack_needed = node->bf.ack_needed;
       log_msg_ack(msg, &path_options, AT_PROCESSED);
       log_msg_free_queue_node(node);
       log_msg_unref(msg);
@@ -567,7 +567,7 @@ log_queue_fifo_rewind_backlog(LogQueue *s, guint rewind_count)
       self->backlog_queue.len--;
       self->output_queue.len++;
 
-      if (!node->flow_control_requested)
+      if (!node->bf.flow_control_requested)
         {
           self->backlog_queue.non_flow_controlled_len--;
           self->output_queue.non_flow_controlled_len++;
@@ -590,7 +590,7 @@ log_queue_fifo_free_queue(struct iv_list_head *q)
       node = iv_list_entry(q->next, LogMessageQueueNode, list);
       iv_list_del(&node->list);
 
-      path_options.ack_needed = node->ack_needed;
+      path_options.ack_needed = node->bf.ack_needed;
       msg = node->msg;
       log_msg_free_queue_node(node);
       log_msg_ack(msg, &path_options, AT_ABORTED);

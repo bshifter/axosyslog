@@ -229,9 +229,12 @@ typedef struct _LogMessageQueueNode
 {
   struct iv_list_head list;
   LogMessage *msg;
-  union
-  {
-    guint ack_needed:1, embedded:1, flow_control_requested:1;
+  union {
+    struct {
+        guint ack_needed:1;
+        guint embedded:1;
+        guint flow_control_requested:1;
+    } bf;
     guint __bitfield;
   };
 } LogMessageQueueNode;
