@@ -1564,8 +1564,6 @@ _load_state(QDisk *self, QDiskMemQLoadFunc func, gpointer user_data)
     }
   else
     {
-      g_assert(func == NULL);
-
       struct stat st;
       fstat(self->fd, &st);
       self->cached_file_size = st.st_size;
