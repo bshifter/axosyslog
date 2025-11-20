@@ -246,13 +246,12 @@ static void
 _assert_log_queue_disk_non_reliable_has_messages_in_front_cache(LogQueue *q, guint num_of_messages)
 {
   LogQueueDiskNonReliable *queue = (LogQueueDiskNonReliable *) q;
-  const guint item_number_per_message = 2;
 
   LogMessage *msg = log_msg_new_empty();
   const gssize log_msg_size = log_msg_get_size(msg);
   log_msg_unref(msg);
 
-  cr_assert_eq(queue->front_cache.len, num_of_messages * item_number_per_message);
+  cr_assert_eq(queue->front_cache.len, num_of_messages);
   cr_assert_eq(queue->flow_control_window.len, 0);
   cr_assert_eq(queue->backlog.len, 0);
   cr_assert_eq(qdisk_get_length(queue->super.qdisk), 0);
