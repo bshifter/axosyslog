@@ -187,7 +187,7 @@ _test_diskq_truncate(TruncateTestParams params)
 
   send_some_messages(q, params.number_of_msgs_to_pop, TRUE);
   cr_assert_eq(log_queue_get_length(q), params.number_of_msgs_to_push - params.number_of_msgs_to_pop,
-               "Invalid number of messages in disk-queue after messages have been popped!");
+               "Invalid number of messages in disk-queue after messages have been popped! %d - %d", log_queue_get_length(q), params.number_of_msgs_to_push - params.number_of_msgs_to_pop);
 
   _save_diskqueue(q);
 
