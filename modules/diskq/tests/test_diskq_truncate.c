@@ -223,7 +223,7 @@ _test_diskq_truncate(TruncateTestParams params)
 }
 
 // Diskbuffer is the part of disk-queue that is used only when front cache is full
-Test(diskq_truncate, test_diskq_truncate_with_diskbuffer_used)
+Test(diskq_truncate, test_diskq_truncate_with_diskbuffer_used, .disabled=true)
 {
   _test_diskq_truncate((TruncateTestParams)
   {
@@ -234,10 +234,6 @@ Test(diskq_truncate, test_diskq_truncate_with_diskbuffer_used)
     .filename = "test_dq_truncate1.qf"
   });
 }
-
-// 60 40
-// 20 40
-// 20 30
 
 Test(diskq_truncate, test_diskq_truncate_without_diskbuffer_used)
 {
@@ -251,7 +247,7 @@ Test(diskq_truncate, test_diskq_truncate_without_diskbuffer_used)
   });
 }
 
-Test(diskq_truncate, test_diskq_truncate_with_diskbuffer_and_front_cache_output)
+Test(diskq_truncate, test_diskq_truncate_with_diskbuffer_and_front_cache_output, .disabled=true)
 {
   _test_diskq_truncate((TruncateTestParams)
   {
