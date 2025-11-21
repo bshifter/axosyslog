@@ -157,7 +157,7 @@ _assert_diskq_actual_file_size_with_expected(LogQueue *q, gboolean should_file_b
       // diskq file is truncated on read when it becomes empty,
       // thus we have to assert to the original file size (after push finished), i.e. the max recorded size
       cr_assert_eq(_get_file_size(q), _calculate_expected_file_size(number_of_messages_on_disk),
-                   "Truncate after load failed: expected size differs");
+                   "Truncate after load failed: expected size differs, %d - %d", _get_file_size(q), _calculate_expected_file_size(number_of_messages_on_disk));
     }
 }
 
@@ -173,11 +173,13 @@ typedef struct
 static void
 _test_diskq_truncate(TruncateTestParams params)
 {
+
+  const gint64 front_cache_size = 40;
   LogQueue *q;
   DiskQueueOptions options;
 
   cr_assert(cfg_init(configuration), "cfg_init failed!");
-  q = _create_non_reliable_diskqueue(params.filename, &options, 40, 0);
+  q = _create_non_reliable_diskqueue(params.filename, &options, front_cache_size, 0);
   cr_assert_eq(log_queue_get_length(q), 0, "No messages should be in a newly created disk-queue file!");
 
   feed_some_messages(q, params.number_of_msgs_to_push);
@@ -187,8 +189,21 @@ _test_diskq_truncate(TruncateTestParams params)
 
   send_some_messages(q, params.number_of_msgs_to_pop, TRUE);
   cr_assert_eq(log_queue_get_length(q), params.number_of_msgs_to_push - params.number_of_msgs_to_pop,
-               "Invalid number of messages in disk-queue after messages have been popped! %d - %d", log_queue_get_length(q), params.number_of_msgs_to_push - params.number_of_msgs_to_pop);
+  "Invalid number of messages in disk-queue after messages have been popped!");
 
+  // gint64 messages_on_disk_after_send = MAX(params.number_of_msgs_to_push - ((1 + (params.number_of_msgs_to_pop / front_cache_size)) * front_cache_size), 0) - params.number_of_msgs_to_pop;
+  // gint64 one_msg_size = get_one_message_serialized_size(); //TODO: remove after debug
+  // fprintf(stderr, "DEBUG>> params.number_of_msgs_to_push:%d \
+  //   params.number_of_msgs_to_pop:%d \
+  //   front_cache_size:%ld \
+  //   one_msg_size:%ld \
+  //   messages_on_disk_after_send:%ld\n",
+  // params.number_of_msgs_to_push,
+  // params.number_of_msgs_to_pop,
+  // front_cache_size,
+  // one_msg_size,
+  // messages_on_disk_after_send
+  // );
   _save_diskqueue(q);
 
   q = _get_non_reliable_diskqueue(params.filename, &options);
@@ -227,6 +242,18 @@ Test(diskq_truncate, test_diskq_truncate_without_diskbuffer_used)
     .number_of_msgs_to_pop = 80,
     .should_file_be_empty_after_truncate = TRUE,
     .filename = "test_dq_truncate2.qf"
+  });
+}
+
+Test(diskq_truncate, test_diskq_truncate_with_diskbuffer_and_front_cache_output)
+{
+  _test_diskq_truncate((TruncateTestParams)
+  {
+    .test_id = __func__,
+    .number_of_msgs_to_push = 130,
+    .number_of_msgs_to_pop = 50, // introduced front_cache_output to bypass locks: 40 moves to front_cache, 40 to front_cache_output
+    .should_file_be_empty_after_truncate = FALSE,
+    .filename = "test_dq_truncate3.qf"
   });
 }
 

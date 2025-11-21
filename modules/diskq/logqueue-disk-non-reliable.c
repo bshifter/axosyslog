@@ -107,6 +107,8 @@ _qtype_to_memory_queue(LogQueueDiskNonReliable *self, QDiskMemoryQueueType type)
 {
   switch (type)
     {
+    case QDISK_MQ_FRONT_CACHE_OUTPUT:
+      return &self->front_cache_output;
     case QDISK_MQ_FRONT_CACHE:
       return &self->front_cache;
     case QDISK_MQ_BACKLOG:
@@ -154,6 +156,7 @@ _get_length(LogQueue *s)
     return 0;
 
   return self->front_cache.len
+         + self->front_cache_output.len
          + qdisk_get_length(self->super.qdisk)
          + self->flow_control_window.len;
 }
@@ -429,37 +432,6 @@ _pop_head(LogQueue *s, LogPathOptions *path_options)
         return NULL;
     }
 
-//   g_mutex_lock(&s->lock);
-
-//   if (self->front_cache.len > 0)
-//     {
-//       msg = _pop_head_front_cache(self, path_options);
-//       if (msg)
-//         goto success;
-//     }
-
-//   msg = log_queue_disk_read_message(&self->super, path_options);
-//   if (msg)
-//     goto success;
-
-//   if (self->flow_control_window.len > 0 && qdisk_is_read_only(self->super.qdisk))
-//     msg = _pop_head_flow_control_window(self, path_options);
-
-//   if (!msg)
-//     {
-//       g_mutex_unlock(&s->lock);
-//       return NULL;
-//     }
-
-// success:
-//   if (!_maybe_move_messages_among_queue_segments(self))
-//     {
-//       stats_update = FALSE;
-//     }
-
-//   log_queue_disk_update_disk_related_counters(&self->super);
-//   g_mutex_unlock(&s->lock);
-
   _push_tail_backlog(self, msg, path_options);
 
   if (stats_update)
@@ -661,10 +633,10 @@ _stop(LogQueueDisk *s, gboolean *persistent)
       result = TRUE;
     }
 
+  _empty_queue(self, &self->front_cache_output);
   _empty_queue(self, &self->flow_control_window);
   _empty_queue(self, &self->front_cache);
   _empty_queue(self, &self->backlog);
-  _empty_queue(self, &self->front_cache_output);
 
   return result;
 }

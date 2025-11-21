@@ -82,6 +82,7 @@ typedef union _QDiskFileHeader
     gint64 write_head;
     gint64 length;
 
+    QDiskQueuePosition front_cache_output_pos;
     QDiskQueuePosition front_cache_pos;
     QDiskQueuePosition backlog_pos;
     QDiskQueuePosition flow_control_window_pos;
@@ -1164,6 +1165,8 @@ _try_to_load_queue(QDisk *self,
 static gboolean
 _load_non_reliable_queues(QDisk *self, QDiskMemQLoadFunc func, gpointer user_data)
 {
+  if (!_try_to_load_queue(self, QDISK_MQ_FRONT_CACHE_OUTPUT, func, user_data, &self->hdr->front_cache_output_pos, "front_cache_output"))
+    return FALSE;
   if (!_try_to_load_queue(self, QDISK_MQ_FRONT_CACHE, func, user_data, &self->hdr->front_cache_pos, "front_cache"))
     return FALSE;
   if (!_try_to_load_queue(self, QDISK_MQ_BACKLOG, func, user_data, &self->hdr->backlog_pos, "backlog"))
@@ -1188,6 +1191,7 @@ _number_of_messages(QDisk *self)
       return self->hdr->length +
              self->hdr->backlog_pos.count +
              self->hdr->front_cache_pos.count +
+             self->hdr->front_cache_output_pos.count +
              self->hdr->flow_control_window_pos.count;
     }
 }
@@ -1195,6 +1199,7 @@ _number_of_messages(QDisk *self)
 static void
 _reset_queue_pointers(QDisk *self)
 {
+  _clear(self->hdr->front_cache_output_pos);
   _clear(self->hdr->front_cache_pos);
   _clear(self->hdr->backlog_pos);
   _clear(self->hdr->flow_control_window_pos);
@@ -1297,8 +1302,12 @@ _save_state(QDisk *self, QDiskMemQSaveFunc func, gpointer user_data)
   QDiskQueuePosition front_cache_pos = { 0 };
   QDiskQueuePosition backlog_pos = { 0 };
   QDiskQueuePosition flow_control_window_pos = { 0 };
+  QDiskQueuePosition front_cache_output_pos = { 0 };
 
   if (func) {
+    if (!_save_queue(self, QDISK_MQ_FRONT_CACHE_OUTPUT, func, user_data, &front_cache_output_pos))
+      return FALSE;
+
     if (!_save_queue(self, QDISK_MQ_FRONT_CACHE, func, user_data, &front_cache_pos))
       return FALSE;
 
@@ -1311,6 +1320,7 @@ _save_state(QDisk *self, QDiskMemQSaveFunc func, gpointer user_data)
 
   memcpy(self->hdr->magic, self->file_id, sizeof(self->hdr->magic));
 
+  self->hdr->front_cache_output_pos = front_cache_output_pos;
   self->hdr->front_cache_pos = front_cache_pos;
   self->hdr->backlog_pos = backlog_pos;
   self->hdr->flow_control_window_pos= flow_control_window_pos;
@@ -1318,6 +1328,7 @@ _save_state(QDisk *self, QDiskMemQSaveFunc func, gpointer user_data)
   if (!self->options->reliable)
     msg_info("Disk-buffer state saved",
              evt_tag_str("filename", self->filename),
+             evt_tag_long("front_cache_output_lenght", front_cache_output_pos.count),
              evt_tag_long("front_cache_length", front_cache_pos.count),
              evt_tag_long("backlog_length", backlog_pos.count),
              evt_tag_long("flow_control_window_length", flow_control_window_pos.count),
@@ -1361,6 +1372,9 @@ _ensure_header_byte_order(QDisk *self)
       self->hdr->read_head = GUINT64_SWAP_LE_BE(self->hdr->read_head);
       self->hdr->write_head = GUINT64_SWAP_LE_BE(self->hdr->write_head);
       self->hdr->length = GUINT64_SWAP_LE_BE(self->hdr->length);
+      self->hdr->front_cache_output_pos.ofs = GUINT64_SWAP_LE_BE(self->hdr->front_cache_output_pos.ofs);
+      self->hdr->front_cache_output_pos.len = GUINT32_SWAP_LE_BE(self->hdr->front_cache_output_pos.len);
+      self->hdr->front_cache_output_pos.count = GUINT32_SWAP_LE_BE(self->hdr->front_cache_output_pos.count);
       self->hdr->front_cache_pos.ofs = GUINT64_SWAP_LE_BE(self->hdr->front_cache_pos.ofs);
       self->hdr->front_cache_pos.len = GUINT32_SWAP_LE_BE(self->hdr->front_cache_pos.len);
       self->hdr->front_cache_pos.count = GUINT32_SWAP_LE_BE(self->hdr->front_cache_pos.count);
@@ -1552,6 +1566,7 @@ _load_state(QDisk *self, QDiskMemQLoadFunc func, gpointer user_data)
 
       msg_debug("Disk-buffer internal state",
                 evt_tag_str("filename", self->filename),
+                evt_tag_long("front_cache_output_length", self->hdr->front_cache_output_pos.count),
                 evt_tag_long("front_cache_length", self->hdr->front_cache_pos.count),
                 evt_tag_long("backlog_length", self->hdr->backlog_pos.count),
                 evt_tag_long("flow_control_window_length", self->hdr->flow_control_window_pos.count),
