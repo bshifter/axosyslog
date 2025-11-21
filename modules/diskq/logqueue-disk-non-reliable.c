@@ -27,6 +27,8 @@
 #include "syslog-ng.h"
 #include "scratch-buffers.h"
 
+#define DEFAULT_FRONT_CACHE_OUTPUT_SIZE 1000
+
 static void
 _init_memory_queue(LogQueueDiskMemoryQueue *q)
 {
@@ -147,6 +149,12 @@ _has_space_in_front_cache(LogQueueDiskNonReliable *self)
   return self->front_cache.len < self->front_cache_size;
 }
 
+static inline gboolean
+_has_space_in_front_cache_output(LogQueueDiskNonReliable *self)
+{
+  return self->front_cache_output.len < self->front_cache_output_size;
+}
+
 static gint64
 _get_length(LogQueue *s)
 {
@@ -262,6 +270,31 @@ _move_messages_from_disk_to_front_cache(LogQueueDiskNonReliable *self)
   return TRUE;
 }
 
+static gboolean
+_move_messages_from_disk_to_front_cache_output(LogQueueDiskNonReliable *self)
+{
+  do
+    {
+      if (qdisk_get_length(self->super.qdisk) <= 0)
+        break;
+
+      LogPathOptions path_options;
+      LogMessage *msg = log_queue_disk_read_message(&self->super, &path_options);
+
+      if (!msg)
+        return FALSE;
+
+      _push_to_memory_queue_tail(&self->front_cache_output, msg, &path_options);
+      log_queue_memory_usage_add(&self->super.super, log_msg_get_size(msg));
+      log_msg_unref(msg);
+
+      log_queue_disk_update_disk_related_counters(&self->super);
+    }
+  while (_has_space_in_front_cache_output(self));
+
+  return TRUE;
+}
+
 static inline gboolean
 _maybe_move_messages_among_queue_segments(LogQueueDiskNonReliable *self)
 {
@@ -305,7 +338,7 @@ _rewind_backlog(LogQueue *s, guint rewind_count)
   guint i;
   LogQueueDiskNonReliable *self = (LogQueueDiskNonReliable *)s;
 
-  g_mutex_lock(&s->lock);
+  // g_mutex_lock(&s->lock);
 
   /* TODO: instead of iterating the messages in the backlog, just move it in
    * one swoop using iv_list_splice() */
@@ -318,11 +351,11 @@ _rewind_backlog(LogQueue *s, guint rewind_count)
       if (!_pop_node_from_memory_queue_head(&self->backlog, &node))
         return;
 
-      _push_node_to_memory_queue_head(&self->front_cache, node);
+      _push_node_to_memory_queue_head(&self->front_cache_output, node);
       log_queue_queued_messages_inc(s);
     }
 
-  g_mutex_unlock(&s->lock);
+  // g_mutex_unlock(&s->lock);
 }
 
 static void
@@ -374,6 +407,14 @@ _move_items_from_front_cache_queue_to_output_queue(LogQueueDiskNonReliable *self
   self->front_cache.len = 0;
 }
 
+static inline void
+_move_items_from_flow_control_window_to_output_queue(LogQueueDiskNonReliable *self)
+{
+  iv_list_splice_tail_init(&self->flow_control_window.items, &self->front_cache_output.items);
+  self->front_cache_output.len = self->flow_control_window.len;
+  self->flow_control_window.len = 0;
+}
+
 static LogMessage *
 _peek_head(LogQueue *s)
 {
@@ -417,6 +458,14 @@ _pop_head(LogQueue *s, LogPathOptions *path_options)
     {
       g_mutex_lock(&s->lock);
       _move_items_from_front_cache_queue_to_output_queue(self);
+      if (self->front_cache_output.len == 0)
+        {
+          _move_messages_from_disk_to_front_cache_output(self);
+          if (self->front_cache_output.len == 0)
+            {
+              _move_items_from_flow_control_window_to_output_queue(self);
+            }
+        }
       if (!_maybe_move_messages_among_queue_segments(self))
         {
           stats_update = FALSE;
@@ -433,31 +482,32 @@ _pop_head(LogQueue *s, LogPathOptions *path_options)
     }
 
   if (!msg)
-    {
-      g_mutex_lock(&s->lock);
+    return NULL;
+    // {
+    //   g_mutex_lock(&s->lock);
 
-      msg = log_queue_disk_read_message(&self->super, path_options);
-      if (msg)
-        goto success;
+    //   msg = log_queue_disk_read_message(&self->super, path_options);
+    //   if (msg)
+    //     goto success;
 
-      if (self->flow_control_window.len > 0 && qdisk_is_read_only(self->super.qdisk))
-        msg = _pop_head_flow_control_window(self, path_options);
+    //   if (self->flow_control_window.len > 0 && qdisk_is_read_only(self->super.qdisk))
+    //     msg = _pop_head_flow_control_window(self, path_options);
 
-      if (!msg)
-        {
-          g_mutex_unlock(&s->lock);
-          return NULL;
-        }
+    //   if (!msg)
+    //     {
+    //       g_mutex_unlock(&s->lock);
+    //       return NULL;
+    //     }
 
-    success:
-      if (!_maybe_move_messages_among_queue_segments(self))
-        {
-          stats_update = FALSE;
-        }
+    // success:
+    //   if (!_maybe_move_messages_among_queue_segments(self))
+    //     {
+    //       stats_update = FALSE;
+    //     }
 
-      log_queue_disk_update_disk_related_counters(&self->super);
-      g_mutex_unlock(&s->lock);
-    }
+    //   log_queue_disk_update_disk_related_counters(&self->super);
+    //   g_mutex_unlock(&s->lock);
+    // }
 
   _push_tail_backlog(self, msg, path_options);
 
@@ -716,6 +766,7 @@ log_queue_disk_non_reliable_new(DiskQueueOptions *options, const gchar *filename
   _init_memory_queue(&self->flow_control_window);
   _init_memory_queue(&self->front_cache_output);
   self->front_cache_size = options->front_cache_size;
+  self->front_cache_output_size = self->front_cache_size != 0 ? self->front_cache_size : DEFAULT_FRONT_CACHE_OUTPUT_SIZE;
   _set_virtual_functions(self);
   return &self->super.super;
 }
