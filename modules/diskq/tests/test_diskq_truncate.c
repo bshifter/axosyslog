@@ -191,19 +191,21 @@ _test_diskq_truncate(TruncateTestParams params)
   cr_assert_eq(log_queue_get_length(q), params.number_of_msgs_to_push - params.number_of_msgs_to_pop,
   "Invalid number of messages in disk-queue after messages have been popped!");
 
-  // gint64 messages_on_disk_after_send = MAX(params.number_of_msgs_to_push - ((1 + (params.number_of_msgs_to_pop / front_cache_size)) * front_cache_size), 0) - params.number_of_msgs_to_pop;
-  // gint64 one_msg_size = get_one_message_serialized_size(); //TODO: remove after debug
-  // fprintf(stderr, "DEBUG>> params.number_of_msgs_to_push:%d \
-  //   params.number_of_msgs_to_pop:%d \
-  //   front_cache_size:%ld \
-  //   one_msg_size:%ld \
-  //   messages_on_disk_after_send:%ld\n",
-  // params.number_of_msgs_to_push,
-  // params.number_of_msgs_to_pop,
-  // front_cache_size,
-  // one_msg_size,
-  // messages_on_disk_after_send
-  // );
+  gint64 messages_on_disk_after_send = MAX(params.number_of_msgs_to_push - ((1 + (params.number_of_msgs_to_pop / front_cache_size)) * front_cache_size), 0) - params.number_of_msgs_to_pop;
+  gint64 one_msg_size = get_one_message_serialized_size(); //TODO: remove after debug
+  fprintf(stderr, "DEBUG>> params.number_of_msgs_to_push:%d \
+    params.number_of_msgs_to_pop:%d \
+    front_cache_size:%ld \
+    one_msg_size:%ld \
+    messages_on_disk_after_push:%ld \
+    messages_on_disk_after_send:%ld\n",
+  params.number_of_msgs_to_push,
+  params.number_of_msgs_to_pop,
+  front_cache_size,
+  one_msg_size,
+  messages_on_disk_after_push,
+  messages_on_disk_after_send
+  );
   _save_diskqueue(q);
 
   q = _get_non_reliable_diskqueue(params.filename, &options);
@@ -232,6 +234,10 @@ Test(diskq_truncate, test_diskq_truncate_with_diskbuffer_used)
     .filename = "test_dq_truncate1.qf"
   });
 }
+
+// 60 40
+// 20 40
+// 20 30
 
 Test(diskq_truncate, test_diskq_truncate_without_diskbuffer_used)
 {

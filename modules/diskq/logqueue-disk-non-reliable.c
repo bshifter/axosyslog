@@ -432,6 +432,33 @@ _pop_head(LogQueue *s, LogPathOptions *path_options)
         return NULL;
     }
 
+  if (!msg)
+    {
+      g_mutex_lock(&s->lock);
+
+      msg = log_queue_disk_read_message(&self->super, path_options);
+      if (msg)
+        goto success;
+
+      if (self->flow_control_window.len > 0 && qdisk_is_read_only(self->super.qdisk))
+        msg = _pop_head_flow_control_window(self, path_options);
+
+      if (!msg)
+        {
+          g_mutex_unlock(&s->lock);
+          return NULL;
+        }
+
+    success:
+      if (!_maybe_move_messages_among_queue_segments(self))
+        {
+          stats_update = FALSE;
+        }
+
+      log_queue_disk_update_disk_related_counters(&self->super);
+      g_mutex_unlock(&s->lock);
+    }
+
   _push_tail_backlog(self, msg, path_options);
 
   if (stats_update)
