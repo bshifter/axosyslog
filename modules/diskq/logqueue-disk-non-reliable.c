@@ -154,6 +154,7 @@ _get_length(LogQueue *s)
     return 0;
 
   return self->front_cache.len
+         + self->front_cache_output.len
          + qdisk_get_length(self->super.qdisk)
          + self->flow_control_window.len;
 }
@@ -259,10 +260,23 @@ _move_messages_from_disk_to_front_cache(LogQueueDiskNonReliable *self)
   return TRUE;
 }
 
+/*
+ * Can only run from the output thread.
+ */
+static inline void
+_move_items_from_front_cache_queue_to_output_queue(LogQueueDiskNonReliable *self)
+{
+  iv_list_splice_tail_init(&self->front_cache.items, &self->front_cache_output.items);
+  self->front_cache_output.len = self->front_cache.len;
+  self->front_cache.len = 0;
+}
+
 static inline gboolean
 _maybe_move_messages_among_queue_segments(LogQueueDiskNonReliable *self)
 {
   gboolean ret = TRUE;
+
+  _move_items_from_front_cache_queue_to_output_queue(self);
 
   if (qdisk_is_read_only(self->super.qdisk))
     return TRUE;
@@ -272,6 +286,9 @@ _maybe_move_messages_among_queue_segments(LogQueueDiskNonReliable *self)
 
   if (self->flow_control_window.len > 0)
     _move_messages_from_overflow(self);
+
+  if (self->front_cache_output.len == 0)
+    _move_items_from_front_cache_queue_to_output_queue(self);
 
   return ret;
 }
@@ -329,11 +346,11 @@ _rewind_backlog_all(LogQueue *s)
 }
 
 static inline LogMessage *
-_pop_head_front_cache(LogQueueDiskNonReliable *self, LogPathOptions *path_options)
+_pop_head_front_cache_output(LogQueueDiskNonReliable *self, LogPathOptions *path_options)
 {
   LogMessage *msg;
 
-  if (!_pop_from_memory_queue_head(&self->front_cache, &msg, path_options))
+  if (!_pop_from_memory_queue_head(&self->front_cache_output, &msg, path_options))
     return NULL;
   log_queue_memory_usage_sub(&self->super.super, log_msg_get_size(msg));
 
@@ -390,14 +407,25 @@ _pop_head(LogQueue *s, LogPathOptions *path_options)
   LogMessage *msg = NULL;
   gboolean stats_update = TRUE;
 
-  g_mutex_lock(&s->lock);
-
-  if (self->front_cache.len > 0)
+  if (self->front_cache_size)
     {
-      msg = _pop_head_front_cache(self, path_options);
-      if (msg)
-        goto success;
+      if (self->front_cache_output.len == 0)
+        {
+          g_mutex_lock(&s->lock);
+          if (!_maybe_move_messages_among_queue_segments(self))
+            stats_update = FALSE;
+        log_queue_disk_update_disk_related_counters(&self->super);
+        g_mutex_unlock(&s->lock);
+      }
+      if (self->front_cache_output.len > 0)
+        {
+          msg = _pop_head_front_cache_output(self, path_options);
+          if (msg)
+            goto exit;
+        }
     }
+
+  g_mutex_lock(&s->lock);
 
   msg = log_queue_disk_read_message(&self->super, path_options);
   if (msg)
@@ -421,6 +449,7 @@ success:
   log_queue_disk_update_disk_related_counters(&self->super);
   g_mutex_unlock(&s->lock);
 
+exit:
   _push_tail_backlog(self, msg, path_options);
 
   if (stats_update)
@@ -583,6 +612,7 @@ _free(LogQueue *s)
 {
   LogQueueDiskNonReliable *self = (LogQueueDiskNonReliable *)s;
 
+  g_assert(self->front_cache_output.len == 0);
   g_assert(self->front_cache.len == 0);
   g_assert(self->backlog.len == 0);
   g_assert(self->flow_control_window.len == 0);
@@ -621,6 +651,7 @@ _stop(LogQueueDisk *s, gboolean *persistent)
       result = TRUE;
     }
 
+  _empty_queue(self, &self->front_cache_output);
   _empty_queue(self, &self->flow_control_window);
   _empty_queue(self, &self->front_cache);
   _empty_queue(self, &self->backlog);
@@ -674,6 +705,7 @@ log_queue_disk_non_reliable_new(DiskQueueOptions *options, const gchar *filename
   _init_memory_queue(&self->front_cache);
   _init_memory_queue(&self->backlog);
   _init_memory_queue(&self->flow_control_window);
+  _init_memory_queue(&self->front_cache_output);
   self->front_cache_size = options->front_cache_size;
   _set_virtual_functions(self);
   return &self->super.super;
