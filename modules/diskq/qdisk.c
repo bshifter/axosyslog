@@ -1164,7 +1164,7 @@ _try_to_load_queue(QDisk *self,
 static gboolean
 _load_non_reliable_queues(QDisk *self, QDiskMemQLoadFunc func, gpointer user_data)
 {
-  if (!_try_to_load_queue(self, QDISK_MQ_FRONT_CACHE, func, user_data, &self->hdr->front_cache_pos, "front_cache"))
+  if (!_try_to_load_queue(self, QDISK_MQ_FRONT_CACHE_OUTPUT, func, user_data, &self->hdr->front_cache_pos, "front_cache"))
     return FALSE;
   if (!_try_to_load_queue(self, QDISK_MQ_BACKLOG, func, user_data, &self->hdr->backlog_pos, "backlog"))
     return FALSE;
@@ -1299,7 +1299,7 @@ _save_state(QDisk *self, QDiskMemQSaveFunc func, gpointer user_data)
   QDiskQueuePosition flow_control_window_pos = { 0 };
 
   if (func) {
-    if (!_save_queue(self, QDISK_MQ_FRONT_CACHE, func, user_data, &front_cache_pos))
+    if (!_save_queue(self, QDISK_MQ_FRONT_CACHE_OUTPUT, func, user_data, &front_cache_pos))
       return FALSE;
 
     if (!_save_queue(self, QDISK_MQ_BACKLOG, func, user_data, &backlog_pos))

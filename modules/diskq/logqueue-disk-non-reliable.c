@@ -107,6 +107,8 @@ _qtype_to_memory_queue(LogQueueDiskNonReliable *self, QDiskMemoryQueueType type)
 {
   switch (type)
     {
+    case QDISK_MQ_FRONT_CACHE_OUTPUT:
+      return &self->front_cache_output;
     case QDISK_MQ_FRONT_CACHE:
       return &self->front_cache;
     case QDISK_MQ_BACKLOG:
@@ -643,6 +645,15 @@ _stop(LogQueueDisk *s, gboolean *persistent)
   LogQueueDiskNonReliable *self = (LogQueueDiskNonReliable *) s;
 
   gboolean result = FALSE;
+
+  // for compatibility reasons we save a single queue for front_cache and front_cache_output
+  // move the rest to front_cache_output, saving as a single queue
+  if (self->front_cache.len > 0)
+  {
+    iv_list_splice_tail_init(&self->front_cache.items, &self->front_cache_output.items);
+    self->front_cache_output.len += self->front_cache.len;
+    self->front_cache.len = 0;
+  }
 
   if (qdisk_stop(s->qdisk, _save_queue_callback, self))
     {
