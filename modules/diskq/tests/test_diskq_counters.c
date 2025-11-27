@@ -197,7 +197,7 @@ Test(diskq_counters, test_non_reliable,
 
   /* Pop one message, disk usage should reduce */
   send_some_messages(queue, 1, TRUE);
-  _assert_counters(queue, 1, 0, expected_capacity, one_message_serialized_size,
+  _assert_counters(queue, 1, one_message_memory_size, expected_capacity, 0,
                    QDISK_RESERVED_SPACE + one_message_serialized_size, __LINE__);
 
   /* Pop one message, memory usage should reduce */
