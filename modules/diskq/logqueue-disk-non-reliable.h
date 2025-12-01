@@ -25,6 +25,15 @@
 #define LOG_QUEUE_DISK_NON_RELIABLE_H_
 
 #include "logqueue-disk.h"
+#include "mainloop-worker.h"
+typedef struct _InputQueue
+{
+  struct iv_list_head items;
+  WorkerBatchCallback cb;
+  guint32 len;
+  guint32 non_flow_controlled_len;
+  guint16 finish_cb_registered;
+} InputQueue;
 
 typedef struct _LogQueueDiskMemoryQueue
 {
@@ -40,6 +49,8 @@ typedef struct _LogQueueDiskNonReliable
   LogQueueDiskMemoryQueue flow_control_window;
   LogQueueDiskMemoryQueue backlog;
   LogQueueDiskMemoryQueue front_cache_output;
+  gint num_input_queues;
+  InputQueue input_queues[0];
 } LogQueueDiskNonReliable;
 
 LogQueue *log_queue_disk_non_reliable_new(DiskQueueOptions *options, const gchar *filename, const gchar *persist_name,
