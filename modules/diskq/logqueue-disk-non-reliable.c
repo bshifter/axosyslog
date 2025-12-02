@@ -675,7 +675,7 @@ _push_tail(LogQueue *s, LogMessage *msg, const LogPathOptions *path_options)
    * front_cache and legacy behaviour.
    */
 
-  if (thread_index >= 0)
+   if (thread_index >= 0)
     {
       /* fastpath, use per-thread input FIFOs */
       if (!self->input_queues[thread_index].finish_cb_registered)
@@ -695,16 +695,19 @@ _push_tail(LogQueue *s, LogMessage *msg, const LogPathOptions *path_options)
       log_msg_write_protect(msg);
       node = log_msg_alloc_queue_node(msg, path_options);
       iv_list_add_tail(&node->list, &self->input_queues[thread_index].items);
+
       self->input_queues[thread_index].len++;
 
       if (!path_options->flow_control_requested)
         self->input_queues[thread_index].non_flow_controlled_len++;
 
-      log_msg_unref(msg);
-      return;
+      // log_msg_unref(msg);
+   return;
     }
     // slow path
+    g_mutex_lock(&self->super.super.lock);
     _orig_push_tail(s, msg, path_options);
+    g_mutex_unlock(&self->super.super.lock);
 }
 
 static void
@@ -848,32 +851,27 @@ _set_virtual_functions(LogQueueDiskNonReliable *self)
 static gpointer
 _move_input(gpointer user_data)
 {
-  fprintf(stderr, "DEBUG> move input\n");
   LogQueueDiskNonReliable *self = (LogQueueDiskNonReliable *) user_data;
   gint thread_index = main_loop_worker_get_thread_index();
   g_assert(thread_index >= 0);
-
-  fprintf(stderr, "DEBUG> move input - thread idx:%d\n", thread_index);
+  LogMessage *msg;
 
   g_mutex_lock(&self->super.super.lock);
 
-
-  InputQueue *iq = ((InputQueue*)&self->input_queues[thread_index].items);
-  fprintf(stderr, "DEBUG>  move input - pre loop:%d iq.len:%d\n", thread_index, iq->len);
-
-  for (gint i = 0; i < iq->len; i++)
+  struct iv_list_head *ilh, *ilh2;
+  iv_list_for_each_safe(ilh, ilh2, &self->input_queues[thread_index].items)
   {
-    LogMessageQueueNode *node = iv_list_entry(&self->input_queues[thread_index].items, LogMessageQueueNode, list);
+    LogMessageQueueNode *node = iv_list_entry(ilh, LogMessageQueueNode, list);
     LogPathOptions lpo = LOG_PATH_OPTIONS_INIT;
     lpo.ack_needed = node->ack_needed;
     lpo.flow_control_requested = node->flow_control_requested;
-    _orig_push_tail(&self->super.super, node->msg, &lpo);
+    msg = node->msg;
+
+    _orig_push_tail(&self->super.super, msg, &lpo);
     iv_list_del_init(&node->list);
     // log_msg_free_queue_node(node);
+    // log_queue_push_notify(&self->super.super);
   }
-
-  fprintf(stderr, "DEBUG> ez a lofasz vegigment:%d\n", thread_index);
-
   g_mutex_unlock(&self->super.super.lock);
   self->input_queues[thread_index].finish_cb_registered = FALSE;
   log_queue_unref(&self->super.super);
@@ -907,10 +905,9 @@ log_queue_disk_non_reliable_new(DiskQueueOptions *options, const gchar *filename
       self->front_cache_output.limit = (options->front_cache_size - 1) / 2;
       self->front_cache.limit = options->front_cache_size - self->front_cache_output.limit;
     }
-  _set_virtual_functions(self);
 
-  self->num_input_queues = max_threads;
-  for (gint i = 0; i < self->num_input_queues; i++)
+    self->num_input_queues = max_threads;
+    for (gint i = 0; i < self->num_input_queues; i++)
     {
       INIT_IV_LIST_HEAD(&self->input_queues[i].items);
       worker_batch_callback_init(&self->input_queues[i].cb);
@@ -918,5 +915,6 @@ log_queue_disk_non_reliable_new(DiskQueueOptions *options, const gchar *filename
       self->input_queues[i].cb.user_data = self;
     }
 
+  _set_virtual_functions(self);
   return &self->super.super;
 }
