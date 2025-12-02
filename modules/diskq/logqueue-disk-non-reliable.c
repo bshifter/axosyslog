@@ -588,7 +588,7 @@ _push_tail_disk(LogQueueDiskNonReliable *self, LogMessage *msg, const LogPathOpt
 }
 
 static void
-_orig_push_tail(LogQueue *s, LogMessage *msg, const LogPathOptions *path_options)
+_push_tail_single_message(LogQueue *s, LogMessage *msg, const LogPathOptions *path_options)
 {
   LogQueueDiskNonReliable *self = (LogQueueDiskNonReliable *)s;
 
@@ -612,11 +612,11 @@ _orig_push_tail(LogQueue *s, LogMessage *msg, const LogPathOptions *path_options
   // g_mutex_lock(&s->lock);
 
   /* we push messages into queue segments in the following order: flow_control_window, disk, front_cache */
-  if (_can_push_to_front_cache(self))
-    {
-      _push_tail_front_cache(self, msg, path_options);
-      goto queued;
-    }
+  // if (_can_push_to_front_cache(self))
+  //   {
+  //     _push_tail_front_cache(self, msg, path_options);
+  //     goto queued;
+  //   }
 
   if (self->flow_control_window.len != 0 || !_push_tail_disk(self, msg, path_options, serialized_msg))
     {
@@ -856,7 +856,11 @@ _move_input(gpointer user_data)
   g_assert(thread_index >= 0);
   LogMessage *msg;
 
+
   g_mutex_lock(&self->super.super.lock);
+
+  gint num_msgs_to_send_to_front_cache = qdisk_get_length(self->super.qdisk) == 0 ?
+    self->front_cache.limit - self->front_cache.len : -1;
 
   struct iv_list_head *ilh, *ilh2;
   iv_list_for_each_safe(ilh, ilh2, &self->input_queues[thread_index].items)
@@ -865,10 +869,26 @@ _move_input(gpointer user_data)
     LogPathOptions lpo = LOG_PATH_OPTIONS_INIT;
     lpo.ack_needed = node->ack_needed;
     lpo.flow_control_requested = node->flow_control_requested;
-    msg = node->msg;
 
-    _orig_push_tail(&self->super.super, msg, &lpo);
-    iv_list_del_init(&node->list);
+    if (num_msgs_to_send_to_front_cache < 0)
+      {
+        // sending a single message to disc or flow-control-window
+        _push_tail_single_message(&self->super.super, node->msg, &lpo);
+        iv_list_del_init(&node->list);
+        self->input_queues[thread_index].len--;
+        break;
+      }
+    else if (num_msgs_to_send_to_front_cache > 0)
+      {
+        _push_tail_front_cache(self, node->msg, &lpo);
+        iv_list_del_init(&node->list);
+        self->input_queues[thread_index].len--;
+        num_msgs_to_send_to_front_cache--;
+        log_queue_queued_messages_inc(&self->super.super);
+      }
+    else
+      break;
+
     // log_msg_free_queue_node(node);
     // log_queue_push_notify(&self->super.super);
   }
@@ -892,7 +912,7 @@ log_queue_disk_non_reliable_new(DiskQueueOptions *options, const gchar *filename
 
   log_queue_disk_init_instance(&self->super, options, "SLQF", filename, persist_name, stats_level,
                                driver_sck_builder, queue_sck_builder);
-  _init_memory_queue(&self->front_cache);
+ _init_memory_queue(&self->front_cache);
   _init_memory_queue(&self->backlog);
   _init_memory_queue(&self->flow_control_window);
   _init_memory_queue(&self->front_cache_output);
