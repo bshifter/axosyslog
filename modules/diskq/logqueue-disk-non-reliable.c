@@ -612,11 +612,11 @@ _push_tail_single_message(LogQueue *s, LogMessage *msg, const LogPathOptions *pa
   // g_mutex_lock(&s->lock);
 
   /* we push messages into queue segments in the following order: flow_control_window, disk, front_cache */
-  // if (_can_push_to_front_cache(self))
-  //   {
-  //     _push_tail_front_cache(self, msg, path_options);
-  //     goto queued;
-  //   }
+  if (_can_push_to_front_cache(self))
+    {
+      _push_tail_front_cache(self, msg, path_options);
+      goto queued;
+    }
 
   if (self->flow_control_window.len != 0 || !_push_tail_disk(self, msg, path_options, serialized_msg))
     {
@@ -701,12 +701,12 @@ _push_tail(LogQueue *s, LogMessage *msg, const LogPathOptions *path_options)
       if (!path_options->flow_control_requested)
         self->input_queues[thread_index].non_flow_controlled_len++;
 
-      // log_msg_unref(msg);
+      log_msg_unref(msg);
    return;
     }
     // slow path
     g_mutex_lock(&self->super.super.lock);
-    _orig_push_tail(s, msg, path_options);
+    _push_tail_single_message(s, msg, path_options);
     g_mutex_unlock(&self->super.super.lock);
 }
 
@@ -854,8 +854,6 @@ _move_input(gpointer user_data)
   LogQueueDiskNonReliable *self = (LogQueueDiskNonReliable *) user_data;
   gint thread_index = main_loop_worker_get_thread_index();
   g_assert(thread_index >= 0);
-  LogMessage *msg;
-
 
   g_mutex_lock(&self->super.super.lock);
 
@@ -876,6 +874,8 @@ _move_input(gpointer user_data)
         _push_tail_single_message(&self->super.super, node->msg, &lpo);
         iv_list_del_init(&node->list);
         self->input_queues[thread_index].len--;
+        log_queue_queued_messages_inc(&self->super.super);
+        log_msg_free_queue_node(node);
         break;
       }
     else if (num_msgs_to_send_to_front_cache > 0)
@@ -885,13 +885,13 @@ _move_input(gpointer user_data)
         self->input_queues[thread_index].len--;
         num_msgs_to_send_to_front_cache--;
         log_queue_queued_messages_inc(&self->super.super);
+        log_msg_free_queue_node(node);
       }
     else
       break;
 
-    // log_msg_free_queue_node(node);
-    // log_queue_push_notify(&self->super.super);
   }
+  log_queue_push_notify(&self->super.super);
   g_mutex_unlock(&self->super.super.lock);
   self->input_queues[thread_index].finish_cb_registered = FALSE;
   log_queue_unref(&self->super.super);
