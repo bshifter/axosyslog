@@ -725,11 +725,10 @@ _empty_queue(LogQueueDiskNonReliable *self, LogQueueDiskMemoryQueue *q)
     }
 }
 
-
-// TODO: check this if correct
 static void
 log_queue_disk_free_queue(struct iv_list_head *q)
 {
+  gint count = 0;
   while (!iv_list_empty(q))
     {
       LogMessageQueueNode *node;
@@ -744,7 +743,9 @@ log_queue_disk_free_queue(struct iv_list_head *q)
       log_msg_free_queue_node(node);
       log_msg_ack(msg, &path_options, AT_ABORTED);
       log_msg_unref(msg);
+      count++;
     }
+  // fprintf(stderr, "DEBUG>>dropping %d messages at free\n", count);
 }
 
 static void
@@ -854,47 +855,50 @@ _move_input(gpointer user_data)
   LogQueueDiskNonReliable *self = (LogQueueDiskNonReliable *) user_data;
   gint thread_index = main_loop_worker_get_thread_index();
   g_assert(thread_index >= 0);
+  // fprintf(stderr, "DEBUG>>move_input(%d) called\n", thread_index);
 
   g_mutex_lock(&self->super.super.lock);
-
   gint num_msgs_to_send_to_front_cache = qdisk_get_length(self->super.qdisk) == 0 ?
-    self->front_cache.limit - self->front_cache.len : -1;
+    MIN(self->front_cache.limit - self->front_cache.len, self->input_queues[thread_index].len) : 0;
 
-  struct iv_list_head *ilh, *ilh2;
-  iv_list_for_each_safe(ilh, ilh2, &self->input_queues[thread_index].items)
-  {
-    LogMessageQueueNode *node = iv_list_entry(ilh, LogMessageQueueNode, list);
-    LogPathOptions lpo = LOG_PATH_OPTIONS_INIT;
-    lpo.ack_needed = node->ack_needed;
-    lpo.flow_control_requested = node->flow_control_requested;
-
-    if (num_msgs_to_send_to_front_cache < 0)
-      {
-        // sending a single message to disc or flow-control-window
+  if (num_msgs_to_send_to_front_cache == 0)
+    {
+      // struct iv_list_head *ilh, *ilh2;
+      // iv_list_for_each_safe(ilh, ilh2, &self->input_queues[thread_index].items)
+      // {
+        // fprintf(stderr, "DEBUG>>move_input legacy workflow for thread(%d) called\n", thread_index);
+        LogMessageQueueNode *node = iv_list_entry(self->input_queues[thread_index].items.next, LogMessageQueueNode, list);
+        LogPathOptions lpo = LOG_PATH_OPTIONS_INIT;
+        lpo.ack_needed = node->ack_needed;
+        lpo.flow_control_requested = node->flow_control_requested;
         _push_tail_single_message(&self->super.super, node->msg, &lpo);
         iv_list_del_init(&node->list);
         self->input_queues[thread_index].len--;
-        log_queue_queued_messages_inc(&self->super.super);
         log_msg_free_queue_node(node);
-        break;
-      }
-    else if (num_msgs_to_send_to_front_cache > 0)
-      {
-        _push_tail_front_cache(self, node->msg, &lpo);
-        iv_list_del_init(&node->list);
-        self->input_queues[thread_index].len--;
-        num_msgs_to_send_to_front_cache--;
-        log_queue_queued_messages_inc(&self->super.super);
-        log_msg_free_queue_node(node);
-      }
-    else
-      break;
+      // }
+      goto exit;
+    }
 
-  }
-  log_queue_push_notify(&self->super.super);
-  g_mutex_unlock(&self->super.super.lock);
+    gint i;
+  for (i = 0; i < num_msgs_to_send_to_front_cache; ++i)
+    {
+      LogMessageQueueNode *node = iv_list_entry(self->input_queues[thread_index].items.next, LogMessageQueueNode, list);
+      LogPathOptions lpo = LOG_PATH_OPTIONS_INIT;
+      lpo.ack_needed = node->ack_needed;
+      lpo.flow_control_requested = node->flow_control_requested;
+      _push_tail_front_cache(self, node->msg, &lpo);
+      iv_list_del_init(&node->list);
+      self->input_queues[thread_index].len--;
+      log_queue_queued_messages_inc(&self->super.super);
+      log_msg_free_queue_node(node);
+    }
+    // fprintf(stderr, "DEBUG>>move_input move to front_cache for thread(%d) called with %d elts\n", thread_index, i);
+
+exit:
   self->input_queues[thread_index].finish_cb_registered = FALSE;
   log_queue_unref(&self->super.super);
+  log_queue_push_notify(&self->super.super);
+  g_mutex_unlock(&self->super.super.lock);
   return NULL;
 }
 
